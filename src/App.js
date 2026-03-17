@@ -25,40 +25,30 @@ import {
   Fade,
   Badge,
   Button,
-  SwipeableDrawer,
+  Snackbar,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AddCircleIcon from "@mui/icons-material/AddCircle";
 import SellIcon from "@mui/icons-material/Sell";
-import HotelIcon from "@mui/icons-material/Hotel";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
-import Brightness7Icon from "@mui/icons-material/Brightness7";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import TireRepairIcon from "@mui/icons-material/BuildCircle";
+import BuildCircleIcon from "@mui/icons-material/BuildCircle";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
 import InventoryIcon from "@mui/icons-material/Inventory";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import TireForm from "./components/TireForm";
+import PersonIcon from "@mui/icons-material/Person";
 import TireList from "./components/TireList";
 import Dashboard from "./components/Dashboard";
 import SaleForm from "./components/SaleForm";
-import TireHotel from "./components/TireHotel";
-import CurrentAccount from "./components/CurrentAccount";
-import Inventory from "./components/Inventory";
-import Deliveries from "./components/Deliveries";
-import VehicleTracking from "./components/VehicleTracking";
-import WorkerTracking from "./components/WorkerTracking";
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
-import PersonIcon from "@mui/icons-material/Person";
-import AppointmentSystem from "./components/AppointmentSystem";
 import "antd/dist/reset.css";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import { AuthProvider, useAuth } from "./components/AuthContext";
+import Login from "./components/Login";
+import { supabase } from "./supabaseClient";
+import Reports from "./components/Reports";
+import Settings from "./components/Settings";
+import CustomerProfile from "./components/CustomerProfile";
+import WorkerTracking from "./components/WorkerTracking";
 
 const drawerWidth = 240;
 
@@ -80,7 +70,7 @@ const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })(
     }),
     [theme.breakpoints.down("sm")]: {
       marginLeft: 0,
-      padding: theme.spacing(2),
+      padding: theme.spacing(1.5),
     },
   })
 );
@@ -117,455 +107,477 @@ const DrawerHeader = styled("div")(({ theme }) => ({
 const Logo = styled("div")(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-  justifyContent: "center",
+  padding: theme.spacing(3, 2),
+  justifyContent: "flex-start",
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    transform: 'scale(1.02)'
+  }
 }));
 
-const StyledBadge = styled(Badge)(({ theme }) => ({
-  "& .MuiBadge-badge": {
-    right: -3,
-    top: 13,
-    border: `2px solid ${theme.palette.background.paper}`,
-    padding: "0 4px",
-  },
-}));
-
-const App = () => {
+const AppContent = () => {
+  const { user, role, isAdmin, logout } = useAuth();
   const [tires, setTires] = useState([]);
   const [sales, setSales] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [hotelTires, setHotelTires] = useState([]);
-  const [selectedComponent, setSelectedComponent] = useState("Dashboard");
-  const [open, setOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [user, setUser] = useState({
-    name: "Yusuf AYKIN",
-    role: "Admin",
-    avatar: "/path/to/avatar.jpg",
-  });
-  const [notifications, setNotifications] = useState(3);
-  const [inventory, setInventory] = useState([]);
-  const [deliveries, setDeliveries] = useState([]);
+  const [parts, setParts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
+  const [open, setOpen] = useState(true);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [businessProfile, setBusinessProfile] = useState({ name: 'Dost Auto Tires', logo_url: '', currency: 'LKR' });
+  const [masterData, setMasterData] = useState({ brands: [], vehicles: [], services: [] });
 
-  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
+  // Sync selected component if permissions change
+  useEffect(() => {
+    if (!isAdmin && (selectedComponent === "Dashboard" || selectedComponent === "InventoryHub" || selectedComponent === "Finance" || selectedComponent === "Settings")) {
+      setSelectedComponent("SaleForm");
+    }
+  }, [isAdmin, selectedComponent]);
+
+  // Initial Fetches and Subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async (table, setter) => {
+      const { data, error } = await supabase.from(table).select('*');
+      if (!error && data) setter(data);
+    };
+
+    // Business Profile & Master Data
+    const fetchBusinessSettings = async () => {
+      const { data, error } = await supabase.from('business_settings').select('*').limit(1).maybeSingle();
+      if (!error && data) setBusinessProfile(data);
+    };
+    fetchBusinessSettings();
+
+    const fetchMasterData = async () => {
+      const { data, error } = await supabase.from('master_data').select('*');
+      if (!error && data) {
+        const formatted = { brands: [], vehicles: [], services: [] };
+        data.forEach(item => {
+          if (formatted[item.type]) formatted[item.type].push(item.value);
+        });
+        setMasterData(formatted);
+      }
+    };
+    fetchMasterData();
+
+    // Data Fetches
+    fetchData('tires', setTires);
+    const fetchSales = async () => {
+      const { data, error } = await supabase.from('sales').select('*, sale_items(*)');
+      if (!error && data) setSales(data);
+    };
+    fetchSales();
+    fetchData('hotel_tires', setHotelTires);
+    fetchData('accounts', setAccounts);
+    fetchData('parts', setParts);
+    fetchData('customers', setCustomers);
+    fetchData('appointments', setAppointments);
+    fetchData('invoices', setInvoices);
+    fetchData('workers', setWorkers);
+    fetchData('tasks', setTasks);
+    fetchData('vehicles', setVehicles);
+
+    // Real-time Subscriptions
+    const channels = [
+      'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
+      'customers', 'appointments', 'invoices', 'workers',
+      'tasks', 'vehicles', 'business_settings', 'master_data'
+    ].map(table => {
+      return supabase.channel(`public:${table}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          if (table === 'master_data') fetchMasterData();
+          else if (table === 'business_settings') fetchData(table, (data) => setBusinessProfile(data[0] || businessProfile));
+          else if (table === 'sales') fetchSales();
+          else fetchData(table, (data) => {
+            const setters = {
+              tires: setTires, hotel_tires: setHotelTires,
+              accounts: setAccounts, parts: setParts, customers: setCustomers,
+              appointments: setAppointments, invoices: setInvoices,
+              workers: setWorkers, tasks: setTasks, vehicles: setVehicles
+            };
+            if (setters[table]) setters[table](data);
+          });
+        })
+        .subscribe();
+    });
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [user]);
+
+  const [userProfile, setUserProfile] = useState({ name: "User", role: "", avatar: "" });
+
+  useEffect(() => {
+    if (user) {
+      setUserProfile({
+        name: user.email.split('@')[0].toUpperCase(),
+        role: role === 'admin' ? 'Administrator' : 'Staff',
+        avatar: "",
+      });
+    }
+  }, [user, role]);
+
+  const [notifications, setNotifications] = useState(3);
   const isMobile = useMediaQuery("(max-width:600px)");
 
   useEffect(() => {
-    setDarkMode(prefersDarkMode);
     if (isMobile) setOpen(false);
-  }, [prefersDarkMode, isMobile]);
+  }, [isMobile]);
 
   const theme = useMemo(
     () =>
       createTheme({
         palette: {
-          mode: darkMode ? "dark" : "light",
-          primary: {
-            main: darkMode ? "#90caf9" : "#1976d2",
+          mode: "light",
+          primary: { 
+            main: "#1a237e",
+            light: "rgba(26, 35, 126, 0.08)",
+            dark: "#0d47a1"
           },
-          secondary: {
-            main: darkMode ? "#f48fb1" : "#dc004e",
+          secondary: { 
+            main: "#f50057",
+            light: "#ff4081"
           },
-          background: {
-            default: darkMode ? "#303030" : "#f5f5f5",
-            paper: darkMode ? "#424242" : "#ffffff",
+          background: { 
+            default: "#f8fafd", 
+            paper: "#ffffff" 
+          },
+          text: { 
+            primary: "#1e293b", 
+            secondary: "#64748b" 
           },
         },
+        shape: { borderRadius: 16 },
         typography: {
-          fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-          h4: {
-            fontWeight: 600,
-          },
+          fontFamily: '"Outfit", "Inter", "Roboto", sans-serif',
+          h4: { fontWeight: 900, letterSpacing: '-0.8px' },
+          h6: { fontWeight: 800 },
+          button: { textTransform: 'none', fontWeight: 700 },
         },
         components: {
           MuiDrawer: {
             styleOverrides: {
               paper: {
-                backgroundColor: darkMode ? "#212121" : "#1976d2",
-                color: "#ffffff",
-              },
-            },
+                backgroundColor: "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(20px)",
+                borderRight: "1px solid rgba(0,0,0,0.06)",
+                boxShadow: "none",
+              }
+            }
           },
-          MuiListItemIcon: {
+          MuiAppBar: {
             styleOverrides: {
               root: {
-                color: "inherit",
-              },
-            },
+                backgroundColor: "rgba(248, 250, 253, 0.8)",
+                backdropFilter: "blur(12px)",
+                color: "#1e293b",
+                borderBottom: "1px solid rgba(0,0,0,0.05)",
+                boxShadow: "none",
+              }
+            }
           },
-          MuiPaper: {
+          MuiCard: {
             styleOverrides: {
               root: {
-                transition: "box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1) 0ms",
-                "&:hover": {
-                  boxShadow: "0px 6px 12px -2px rgba(0,0,0,0.2)",
-                },
-              },
-            },
+                boxShadow: "0 4px 25px -5px rgba(0,0,0,0.04), 0 2px 10px -5px rgba(0,0,0,0.02)",
+                border: "1px solid rgba(0,0,0,0.05)",
+                borderRadius: 24,
+              }
+            }
           },
           MuiButton: {
             styleOverrides: {
               root: {
-                borderRadius: 8,
+                borderRadius: 12,
+                padding: '10px 24px',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }
               },
-            },
+              containedPrimary: {
+                background: 'linear-gradient(135deg, #1a237e 0%, #311b92 100%)',
+              }
+            }
           },
         },
       }),
-    [darkMode]
+    []
   );
 
-  useEffect(() => {
-    const loadData = () => {
-      const storedTires = JSON.parse(localStorage.getItem("tires")) || [];
-      const storedSales = JSON.parse(localStorage.getItem("sales")) || [];
-      const storedHotelTires =
-        JSON.parse(localStorage.getItem("hotelTires")) || [];
-      const storedInventory =
-        JSON.parse(localStorage.getItem("inventory")) || [];
-      const storedDeliveries =
-        JSON.parse(localStorage.getItem("deliveries")) || [];
-      setTires(storedTires);
-      setSales(storedSales);
-      setHotelTires(storedHotelTires);
-      setInventory(storedInventory);
-      setDeliveries(storedDeliveries);
-    };
-
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("tires", JSON.stringify(tires));
-  }, [tires]);
-
-  useEffect(() => {
-    localStorage.setItem("sales", JSON.stringify(sales));
-  }, [sales]);
-
-  useEffect(() => {
-    localStorage.setItem("hotelTires", JSON.stringify(hotelTires));
-  }, [hotelTires]);
-
-  useEffect(() => {
-    localStorage.setItem("inventory", JSON.stringify(inventory));
-  }, [inventory]);
-
-  useEffect(() => {
-    localStorage.setItem("deliveries", JSON.stringify(deliveries));
-  }, [deliveries]);
-
-  const addTire = (tire) => {
-    setTires((prevTires) => [...prevTires, { ...tire, id: Date.now() }]);
-    updateInventory(tire.id, tire.stock, "increase");
+  const addTire = async (tire) => {
+    try {
+      await supabase.from('tires').insert([{ ...tire }]);
+    } catch (e) { console.error(e); }
   };
 
-  const addSale = (sale) => {
-    const tire = tires.find((t) => t.id === sale.tireId);
-    const profit = (sale.price - tire.price) * sale.quantity;
-    setSales((prevSales) => [
-      ...prevSales,
-      { ...sale, id: Date.now(), profit },
-    ]);
-    updateStock(sale.tireId, sale.quantity);
-    updateInventory(sale.tireId, sale.quantity, "decrease");
+  const updateTire = async (tireId, updatedData) => {
+    try {
+      await supabase.from('tires').update(updatedData).eq('id', tireId);
+    } catch (e) { console.error(e); }
   };
 
-  const updateStock = (tireId, soldQuantity) => {
-    setTires((prevTires) =>
-      prevTires.map((tire) =>
-        tire.id === tireId
-          ? { ...tire, stock: parseInt(tire.stock) - parseInt(soldQuantity) }
-          : tire
-      )
-    );
+  const deleteTire = async (tireId) => {
+    try {
+      await supabase.from('tires').delete().eq('id', tireId);
+    } catch (e) { console.error(e); }
   };
 
-  const addHotelTire = (hotelTire) => {
-    setHotelTires((prevHotelTires) => [
-      ...prevHotelTires,
-      { ...hotelTire, id: Date.now() },
-    ]);
+  const addSale = async (invoice) => {
+    try {
+      const { data, error } = await supabase.rpc('process_sale', { sale_payload: invoice });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+      return true;
+    } catch (e) {
+      console.error("Error processing sale: ", e);
+      return false;
+    }
   };
 
-  const updateInventory = (tireId, quantity, action) => {
-    setInventory((prevInventory) => {
-      const existingItem = prevInventory.find((item) => item.tireId === tireId);
-      if (existingItem) {
-        return prevInventory.map((item) =>
-          item.tireId === tireId
-            ? {
-                ...item,
-                quantity:
-                  action === "increase"
-                    ? item.quantity + quantity
-                    : item.quantity - quantity,
-              }
-            : item
-        );
-      } else {
-        return [...prevInventory, { tireId, quantity }];
-      }
-    });
+  const addHotelTire = async (hotelTire) => {
+    await supabase.from('hotel_tires').insert([hotelTire]);
   };
 
-  const addDelivery = (delivery) => {
-    setDeliveries((prevDeliveries) => [
-      ...prevDeliveries,
-      { ...delivery, id: Date.now() },
-    ]);
-    updateInventory(delivery.tireId, delivery.quantity, "increase");
+  const updateHotelTire = async (id, updatedData) => {
+    await supabase.from('hotel_tires').update(updatedData).eq('id', id);
   };
 
-  const handleDrawerToggle = () => {
-    setOpen(!open);
+  const deleteHotelTire = async (id) => {
+    await supabase.from('hotel_tires').delete().eq('id', id);
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+  const handleDrawerToggle = () => setOpen(!open);
+  const handleMenu = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
 
-  const handleMenu = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
+  const handleLogout = () => {
+    logout();
+    handleClose();
   };
 
   const menuItems = [
-    {
-      text: "Gösterge Paneli",
-      icon: <DashboardIcon />,
-      component: "Dashboard",
-    },
-    { text: "Lastik Ekle", icon: <AddCircleIcon />, component: "TireForm" },
-    { text: "Lastik Listesi", icon: <ListAltIcon />, component: "TireList" },
-    { text: "Lastik Sat", icon: <SellIcon />, component: "SaleForm" },
-    { text: "Lastik Oteli", icon: <HotelIcon />, component: "TireHotel" },
-
-    {
-      text: "Cari Hesap",
-      icon: <AnalyticsIcon />,
-      component: "CurrentAccount",
-    },
-    {
-      text: "Araç Takip",
-      icon: <DirectionsCarIcon />,
-      component: "VehicleTracking",
-    },
-    {
-      text: "İşçi Takip",
-      icon: <PersonIcon />,
-      component: "WorkerTracking",
-    },
-    {
-      text: "Randevu Sistemi",
-      icon: <CalendarTodayIcon />,
-      component: "AppointmentSystem",
-    },
-    { text: "Ayarlar", icon: <LocalShippingIcon />, component: "Settings" },
+    { text: "Dashboard", icon: <DashboardIcon />, component: "Dashboard", adminOnly: true },
+    { text: "Inventory Hub", icon: <InventoryIcon />, component: "InventoryHub", adminOnly: true },
+    { text: "Sales & POS", icon: <SellIcon />, component: "SaleForm" },
+    { text: "Customer CRM", icon: <PersonIcon />, component: "CustomerCRM" },
+    { text: "Workshop", icon: <BuildCircleIcon />, component: "Workshop" },
+    { text: "Finance", icon: <AnalyticsIcon />, component: "Finance", adminOnly: true },
+    { text: "Settings", icon: <SettingsIcon />, component: "Settings", adminOnly: true },
   ];
 
   const drawer = (
     <div>
       <Logo>
-        <TireRepairIcon sx={{ fontSize: 40, mr: 1 }} />
-        <Typography variant="h6" noWrap component="div">
-          Dost Oto Lastik
+        {businessProfile.logo_url ? (
+          <img src={businessProfile.logo_url} alt="Logo" style={{ height: 40, marginRight: 8 }} />
+        ) : (
+          <BuildCircleIcon sx={{ fontSize: 36, mr: 1.5, color: 'primary.main' }} />
+        )}
+        <Typography variant="h6" noWrap sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '-0.5px' }}>
+          {businessProfile.name}
         </Typography>
       </Logo>
-      <Divider />
+      <Divider sx={{ opacity: 0.6 }} />
       <Box sx={{ p: 2, display: "flex", alignItems: "center" }}>
-        <Avatar src={user.avatar} alt={user.name} sx={{ mr: 2 }} />
+        <Avatar src={userProfile.avatar} alt={userProfile.name} sx={{ mr: 2 }} />
         <Box>
-          <Typography variant="subtitle1">{user.name}</Typography>
-          <Typography variant="body2" color="textSecondary">
-            {user.role}
-          </Typography>
+          <Typography variant="subtitle1">{userProfile.name}</Typography>
+          <Typography variant="body2" color="textSecondary">{userProfile.role}</Typography>
         </Box>
       </Box>
       <Divider />
       <List>
-        {menuItems.map((item) => (
-          <ListItem
-            button
-            key={item.text}
-            onClick={() => {
-              setSelectedComponent(item.component);
-              if (isMobile) setOpen(false);
-            }}
-            selected={selectedComponent === item.component}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
+        {menuItems
+          .filter(item => !item.adminOnly || isAdmin)
+          .map((item) => (
+            <ListItem 
+              button 
+              key={item.text} 
+              onClick={() => { setSelectedComponent(item.component); if (isMobile) setOpen(false); }} 
+              selected={selectedComponent === item.component}
+              sx={{
+                mx: 1.5,
+                my: 0.5,
+                borderRadius: 3,
+                width: 'auto',
+                transition: 'all 0.2s',
+                '&.Mui-selected': {
+                  bgcolor: 'primary.light',
+                  color: 'primary.main',
+                  '& .MuiListItemIcon-root': { color: 'primary.main' },
+                  '&:hover': { bgcolor: 'primary.light' }
+                },
+                '&:hover': {
+                  bgcolor: 'rgba(0,0,0,0.02)',
+                  transform: 'translateX(4px)'
+                }
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 45, color: 'text.secondary', transition: 'color 0.2s' }}>{item.icon}</ListItemIcon>
+              <ListItemText 
+                primary={item.text} 
+                primaryTypographyProps={{ 
+                  fontWeight: selectedComponent === item.component ? 800 : 600,
+                  fontSize: '0.9rem'
+                }} 
+              />
+            </ListItem>
+          ))}
       </List>
     </div>
   );
 
   const renderComponent = () => {
+    const commonProps = { businessProfile, masterData };
+
     switch (selectedComponent) {
-      case "Dashboard":
-        return <Dashboard tires={tires} sales={sales} />;
-      case "TireForm":
-        return <TireForm addTire={addTire} />;
-      case "SaleForm":
-        return <SaleForm tires={tires} addSale={addSale} />;
-      case "TireHotel":
-        return (
-          <TireHotel hotelTires={hotelTires} addHotelTire={addHotelTire} />
-        );
-      case "TireList":
-        return <TireList tires={tires} />;
-      case "CurrentAccount":
-        return <CurrentAccount tires={tires} />;
-      case "Inventory":
-        return <Inventory inventory={inventory} tires={tires} />;
-      case "VehicleTracking":
-        return <VehicleTracking />;
-      case "WorkerTracking":
-        return <WorkerTracking />;
-      case "AppointmentSystem":
-        return <AppointmentSystem />;
-      case "Deliveries":
-        return (
-          <Deliveries
-            deliveries={deliveries}
-            addDelivery={addDelivery}
-            tires={tires}
+      case "Dashboard": 
+        return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      
+      case "InventoryHub": 
+        return isAdmin ? (
+          <TireList 
+            tires={tires || []} addTire={addTire} updateTire={updateTire} deleteTire={deleteTire} 
+            parts={parts || []} hotelTires={hotelTires || []} 
+            {...commonProps} 
           />
-        );
-      default:
-        return <Dashboard tires={tires} sales={sales} />;
+        ) : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      
+      case "SaleForm": 
+        return <SaleForm tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} {...commonProps} />;
+      
+      case "CustomerCRM": 
+        return <CustomerProfile 
+          customers={customers || []} vehicles={vehicles || []} accounts={accounts || []} 
+          hotelTires={hotelTires || []} appointments={appointments || []} sales={sales || []} 
+          {...commonProps} 
+        />;
+      
+      case "Workshop": 
+        return <WorkerTracking workersList={workers || []} tasksList={tasks || []} {...commonProps} />;
+      
+      case "Finance": 
+        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      
+      case "Settings": 
+        return isAdmin ? <Settings {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      
+      default: return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
     }
   };
+
+  if (!user) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Login />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Box sx={{ display: "flex" }}>
+        <Box sx={{ display: "flex", minHeight: '100vh', bgcolor: 'background.default' }}>
           <StyledAppBar position="fixed" open={open}>
             <Toolbar>
-              <IconButton
-                color="inherit"
-                aria-label="open drawer"
-                onClick={handleDrawerToggle}
-                edge="start"
-                sx={{ mr: 2, ...(open && { display: { sm: "none" } }) }}
+              <IconButton color="inherit" onClick={handleDrawerToggle} edge="start" sx={{ mr: 2, ...(open && { display: { sm: "none" } }) }}><MenuIcon /></IconButton>
+              <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                <Typography variant="h6" noWrap sx={{ color: 'primary.main', fontWeight: 800 }}>
+                  {businessProfile.name}
+                </Typography>
+                <Divider orientation="vertical" flexItem sx={{ mx: 2, height: 24, alignSelf: 'center', borderColor: 'rgba(0,0,0,0.1)' }} />
+                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                  {selectedComponent}
+                </Typography>
+              </Box>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={<SellIcon />} 
+                onClick={() => setSelectedComponent("SaleForm")}
+                sx={{ 
+                  mr: 2, 
+                  display: { xs: 'none', md: 'flex' },
+                  borderColor: 'rgba(0,0,0,0.1)',
+                  color: 'text.secondary'
+                }}
               >
-                <MenuIcon />
-              </IconButton>
-              <Typography
-                variant="h6"
-                noWrap
-                component="div"
-                sx={{ flexGrow: 1 }}
-              >
-                {selectedComponent}
-              </Typography>
-              <IconButton color="inherit" onClick={() => setNotifications(0)}>
-                <StyledBadge badgeContent={notifications} color="secondary">
-                  <NotificationsIcon />
-                </StyledBadge>
-              </IconButton>
-              <IconButton
-                sx={{ ml: 1 }}
-                onClick={toggleDarkMode}
-                color="inherit"
-              >
-                {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
-              </IconButton>
-              <Tooltip title="Hesap ayarları">
-                <IconButton onClick={handleMenu} color="inherit">
+                QUICK POS
+              </Button>
+              <IconButton color="inherit" sx={{ mr: 1 }}><Badge badgeContent={notifications} color="secondary"><NotificationsIcon /></Badge></IconButton>
+              <Tooltip title="Account Settings">
+                <IconButton onClick={handleMenu} sx={{ p: 0.5 }}>
                   <Avatar
-                    src={user.avatar}
-                    alt={user.name}
-                    sx={{ width: 32, height: 32 }}
-                  />
+                    src={userProfile.avatar}
+                    alt={userProfile.name}
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      bgcolor: 'primary.main',
+                      border: '2px solid white',
+                      boxShadow: '0 0 0 2px rgba(26, 35, 126, 0.2)'
+                    }}
+                  >
+                    {userProfile.name.charAt(0)}
+                  </Avatar>
                 </IconButton>
               </Tooltip>
               <Menu
-                id="menu-appbar"
                 anchorEl={anchorEl}
-                anchorOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
+                PaperProps={{
+                  sx: {
+                    mt: 1.5,
+                    minWidth: 180,
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+                    borderRadius: 2
+                  }
+                }}
               >
-                <MenuItem onClick={handleClose}>
-                  <ListItemIcon>
-                    <SettingsIcon fontSize="small" />
-                  </ListItemIcon>
-                  <Typography variant="inherit">Ayarlar</Typography>
-                </MenuItem>
-                <MenuItem onClick={handleClose}>
-                  <ListItemIcon>
-                    <ExitToAppIcon fontSize="small" />
-                  </ListItemIcon>
-                  <Typography variant="inherit">Çıkış Yap</Typography>
+                <MenuItem onClick={handleLogout} sx={{ py: 1.5 }}>
+                  <ListItemIcon><ExitToAppIcon fontSize="small" /></ListItemIcon>
+                  Log Out
                 </MenuItem>
               </Menu>
             </Toolbar>
           </StyledAppBar>
-          {isMobile ? (
-            <SwipeableDrawer
-              anchor="left"
-              open={open}
-              onClose={handleDrawerToggle}
-              onOpen={handleDrawerToggle}
-              sx={{
-                width: drawerWidth,
-                flexShrink: 0,
-                "& .MuiDrawer-paper": {
-                  width: drawerWidth,
-                  boxSizing: "border-box",
-                },
-              }}
-            >
-              {drawer}
-            </SwipeableDrawer>
-          ) : (
-            <Drawer
-              sx={{
-                width: drawerWidth,
-                flexShrink: 0,
-                "& .MuiDrawer-paper": {
-                  width: drawerWidth,
-                  boxSizing: "border-box",
-                },
-              }}
-              variant="persistent"
-              anchor="left"
-              open={open}
-            >
-              {drawer}
-            </Drawer>
-          )}
+          <Drawer sx={{ width: drawerWidth, flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }} variant={isMobile ? "temporary" : "persistent"} anchor="left" open={open} onClose={() => setOpen(false)}>
+            {drawer}
+          </Drawer>
           <Main open={open}>
             <DrawerHeader />
-            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-              <Fade in={true} timeout={1000}>
-                <Paper elevation={3} sx={{ p: 2, borderRadius: "8px" }}>
-                  {renderComponent()}
-                </Paper>
+            <Container maxWidth={false} sx={{ mt: 2, mb: 4, px: { xs: 1, sm: 4 } }}>
+              <Fade in={true} timeout={500}>
+                <Box>{renderComponent()}</Box>
               </Fade>
             </Container>
           </Main>
         </Box>
       </Router>
     </ThemeProvider>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
