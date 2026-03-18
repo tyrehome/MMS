@@ -1,14 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import {
-  TextField, Paper, Typography, Dialog, DialogTitle, DialogContent,
-  IconButton, Snackbar, Button, Box, Grid, Select,
+  TextField, Typography,
+  Snackbar, Button, Box, Grid, Select,
   MenuItem, FormControl, InputLabel,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
-  Divider, Autocomplete, Avatar, Tooltip, Card, Tab, Tabs, Alert
+  Divider, Autocomplete, Avatar, Card, Tab, Tabs, Alert
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import {
-    Add as AddIcon,
     Warning as WarningIcon,
     Search as SearchIcon,
     LocalShipping as GRNIcon,
@@ -19,14 +17,13 @@ import {
 import { useAuth } from './AuthContext';
 import PartsInventory from './PartsInventory';
 import TireHotel from './TireHotel';
-import { supabase } from '../supabaseClient';
 
 const TireList = ({ 
     tires = [], addTire, updateTire, deleteTire, 
     parts = [], hotelTires = [], 
     masterData, businessProfile 
 }) => {
-  const { isAdmin } = useAuth();
+  useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('brand');

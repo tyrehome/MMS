@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  TextField, Button, Grid, Typography, Box, IconButton, Dialog, DialogTitle, DialogContent,
-  Snackbar, Alert, Chip, Avatar, Card, CardContent, Tabs, Tab
+  TextField, Button, Grid, Typography, Box, IconButton,
+  Card, Tabs, Tab, Chip, Avatar
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
-    Delete as DeleteIcon,
     Edit as EditIcon,
     Add as AddIcon,
-    Inventory as InventoryIcon,
-    Launch as ReleaseIcon
+    Inventory as InventoryIcon
 } from '@mui/icons-material';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   border: 'none',
@@ -30,13 +28,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   },
 }));
 
-const CHART_COLORS = ['#1a237e', '#3949ab', '#5c6bc0', '#7986cb', '#9fa8da', '#c5cae9'];
+
 
 function TireHotel({ hotelTiresProps = [], customersProps = [], addHotelTire, updateHotelTire, deleteHotelTire }) {
   const [hotelTires, setHotelTires] = useState(hotelTiresProps);
-  const [customers, setCustomers] = useState(customersProps);
-  const [newTire, setNewTire] = useState({ customer_name: '', brand: '', size: '', quantity: '', storage_date: '', plate_number: '' });
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState(0);
 
@@ -116,7 +111,7 @@ function TireHotel({ hotelTiresProps = [], customersProps = [], addHotelTire, up
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <TextField placeholder="Filter inventory..." size="small" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ sx: { borderRadius: 4, width: 300, bgcolor: '#fff' } }} />
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsDialogOpen(true)} sx={{ borderRadius: 3, fontWeight: 900 }}>SECURE NEW ASSET</Button>
+                <Button variant="contained" startIcon={<AddIcon />} sx={{ borderRadius: 3, fontWeight: 900 }}>SECURE NEW ASSET</Button>
             </Box>
             <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>            <StyledDataGrid rows={filteredTires} columns={columns} autoHeight components={{ Toolbar: GridToolbar }} />
             </Card>

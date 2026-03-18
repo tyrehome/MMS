@@ -28,7 +28,6 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
   const [invoices, setInvoices] = useState(invoicesList);
   const [currentTab, setCurrentTab] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false);
   const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -36,7 +35,6 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
   
   const [accountDetails, setAccountDetails] = useState({ name: "", receivable: 0, payable: 0, category: 'Customer' });
   const [transactionDetails, setTransactionDetails] = useState({ type: "receivable", amount: 0, description: "", date: new Date().toISOString().split("T")[0] });
-  const [invoiceDetails, setInvoiceDetails] = useState({ number: "", date: new Date().toISOString().split("T")[0], total: 0 });
 
   const currency = businessProfile?.currency || 'LKR';
 

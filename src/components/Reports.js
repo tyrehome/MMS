@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
     Typography, Box, Tab, Tabs, Grid, Card, CardContent, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-    Divider, Chip, TextField, InputAdornment, Button, IconButton,
+    Chip, TextField, InputAdornment, Button, IconButton,
     Collapse, Avatar, MenuItem, Select, FormControl, InputLabel, Tooltip
 } from '@mui/material';
 import {
@@ -12,7 +12,6 @@ import { useAuth } from './AuthContext';
 import CurrentAccount from './CurrentAccount';
 import { supabase } from '../supabaseClient';
 import {
-    Assessment as AssessmentIcon,
     AccountBalance as BankIcon,
     Timeline as AnalyticsIcon,
     History as HistoryIcon,
@@ -25,7 +24,6 @@ import {
     Security as AuditIcon,
     CalendarToday as CalendarIcon,
     Receipt as ReceiptIcon,
-    FilterList as FilterIcon,
     Refresh as RefreshIcon,
 } from '@mui/icons-material';
 

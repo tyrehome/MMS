@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box, Typography, TextField, Button, Paper, Grid, Divider,
+    Box, Typography, TextField, Button, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     IconButton, Alert, CircularProgress, Avatar, Chip, Card, CardContent,
     FormControl, InputLabel, Select, MenuItem
@@ -14,7 +14,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import { createClient } from '@supabase/supabase-js';
 
 const Settings = ({ businessProfile: propBusinessProfile, masterData: propMasterData }) => {
-    const { user: currentUser, isAdmin } = useAuth();
+    const { user: currentUser } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -27,7 +27,6 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
 
     // Users & Invitations State
     const [users, setUsers] = useState([]);
-    const [invitations, setInvitations] = useState([]);
     const [newUserEmail, setNewUserEmail] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
     const [newUserName, setNewUserName] = useState('');
@@ -50,10 +49,6 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                 const { data: profiles, error: pError } = await supabase.from('profiles').select('*');
                 if (pError) throw pError;
                 setUsers(profiles || []);
-
-                const { data: invites, error: iError } = await supabase.from('invitations').select('*');
-                if (iError) throw iError;
-                setInvitations(invites || []);
             } catch (err) {
                 console.error("Error fetching users/invites:", err);
                 setError('Failed to load user data.');
@@ -123,7 +118,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
             const fileName = `logo-${Math.random()}.${fileExt}`;
             const filePath = `${fileName}`;
 
-            const { error: uploadError, data } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('logos')
                 .upload(filePath, file);
 

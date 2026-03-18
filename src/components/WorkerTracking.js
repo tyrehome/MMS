@@ -27,7 +27,14 @@ const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   const [workerFormData, setWorkerFormData] = useState({ name: '', role: '', phone: '' });
-  const [taskFormData, setTaskFormData] = useState({ task: 'Installation', details: '', date: format(new Date(), 'yyyy-MM-dd'), time: format(new Date(), 'HH:mm') });
+  const [taskFormData, setTaskFormData] = useState({ 
+    task: 'Installation', 
+    details: '', 
+    customer_name: '', 
+    vehicle_number: '',
+    date: format(new Date(), 'yyyy-MM-dd'), 
+    time: format(new Date(), 'HH:mm') 
+  });
 
   useEffect(() => { setWorkers(workersList); }, [workersList]);
   useEffect(() => { setTasks(tasksList); }, [tasksList]);
@@ -40,15 +47,38 @@ const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
   };
 
   const handleTaskSubmit = async () => {
-    const newTask = { ...taskFormData, worker_id: currentWorker.id, status: 'In Progress' };
+    const newTask = { 
+      ...taskFormData, 
+      worker_id: currentWorker.id, 
+      status: 'In Progress' 
+    };
     await supabase.from('tasks').insert([newTask]);
     setIsTaskModalOpen(false);
+    setTaskFormData({ 
+      task: 'Installation', 
+      details: '', 
+      customer_name: '', 
+      vehicle_number: '',
+      date: format(new Date(), 'yyyy-MM-dd'), 
+      time: format(new Date(), 'HH:mm') 
+    });
     setSnackbar({ open: true, message: 'Deployment authorized' });
   };
 
   const completeTask = async (id) => {
     await supabase.from('tasks').update({ status: 'Completed', completion_time: new Date().toISOString() }).eq('id', id);
     setSnackbar({ open: true, message: 'Mission achieved' });
+  };
+
+  const handleBillTask = (task) => {
+    setBillingDraft({
+      customer_name: task.customer_name,
+      vehicle_number: task.vehicle_number,
+      service_name: task.task,
+      details: task.details,
+      worker_id: task.worker_id
+    });
+    setSelectedComponent("SaleForm");
   };
 
   const getWorkerStats = (workerId) => {
@@ -131,6 +161,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
                 <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 900, py: 3 }}>OPERATIVE</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>CUSTOMER / VEHICLE</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>TASK</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>STATUS</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 900 }}>ACTION</TableCell>
@@ -141,12 +172,33 @@ const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
                     <TableRow key={task.id} hover>
                       <TableCell sx={{ fontWeight: 800 }}>{workers.find(w => w.id === task.worker_id)?.name}</TableCell>
                       <TableCell>
+                        <Typography sx={{ fontWeight: 700 }}>{task.customer_name || 'N/A'}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.6 }}>{task.vehicle_number}</Typography>
+                      </TableCell>
+                      <TableCell>
                         <Typography sx={{ fontWeight: 900 }}>{task.task}</Typography>
                         <Typography variant="caption" sx={{ opacity: 0.6 }}>{task.details}</Typography>
                       </TableCell>
                       <TableCell><Chip label={task.status} size="small" color={task.status === 'Completed' ? 'success' : 'primary'} sx={{ fontWeight: 900, borderRadius: 2 }} /></TableCell>
                       <TableCell align="right">
-                        {task.status !== 'Completed' && <IconButton color="success" onClick={() => completeTask(task.id)}><CheckCircleIcon /></IconButton>}
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          {task.status !== 'Completed' && (
+                            <IconButton color="success" onClick={() => completeTask(task.id)}>
+                              <CheckCircleIcon />
+                            </IconButton>
+                          )}
+                          {task.status === 'Completed' && (
+                            <Button 
+                              size="small" 
+                              variant="outlined" 
+                              color="secondary" 
+                              onClick={() => handleBillTask(task)}
+                              sx={{ fontWeight: 900, borderRadius: 2 }}
+                            >
+                              BILL
+                            </Button>
+                          )}
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -180,7 +232,9 @@ const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
                     <MenuItem value="Mechanical">Mechanical Work</MenuItem>
                 </Select>
             </FormControl>
-            <TextField fullWidth multiline rows={3} label="Technical Details" value={taskFormData.details} onChange={e => setTaskFormData({...taskFormData, details: e.target.value})} />
+            <TextField fullWidth sx={{ mt: 1 }} label="Customer Name" value={taskFormData.customer_name} onChange={e => setTaskFormData({...taskFormData, customer_name: e.target.value})} />
+            <TextField fullWidth sx={{ mt: 1 }} label="Vehicle Number" value={taskFormData.vehicle_number} onChange={e => setTaskFormData({...taskFormData, vehicle_number: e.target.value})} />
+            <TextField fullWidth sx={{ mt: 1 }} multiline rows={3} label="Technical Details" value={taskFormData.details} onChange={e => setTaskFormData({...taskFormData, details: e.target.value})} />
             <Button variant="contained" fullWidth size="large" onClick={handleTaskSubmit} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>AUTHORIZE DEPLOYMENT</Button>
         </DialogContent>
       </Dialog>

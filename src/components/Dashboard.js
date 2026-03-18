@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Typography, Grid, Card, CardContent, Avatar, useTheme, Modal,
+  Typography, Grid, Card, CardContent, Avatar, Modal,
   IconButton, Box, Button, Collapse, Divider, Chip
 } from '@mui/material';
 import {
-  PieChart as PieChartIcon, AttachMoney as AttachMoneyIcon,
+  AttachMoney as AttachMoneyIcon,
   TrendingUp as TrendingUpIcon, ShowChart as ShowChartIcon,
   Close as CloseIcon, Inventory as InventoryIcon,
   Category as CategoryIcon, LocalShipping as LocalShippingIcon,
@@ -13,7 +13,7 @@ import {
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import {
-  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
@@ -92,7 +92,7 @@ const StatCard = ({ stat }) => (
 function Dashboard({ tires = [], sales = [], businessProfile }) {
   const currency = businessProfile?.currency || 'LKR';
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedChart, setSelectedChart] = useState(null);
+  const [selectedChart] = useState(null);
   const [expanded, setExpanded] = useState(false);
 
   const handleExpandClick = () => setExpanded(!expanded);

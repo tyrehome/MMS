@@ -13,12 +13,19 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // 1. Get initial session
         const getInitialSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setUser(session.user);
-                await fetchProfile(session.user);
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                
+                if (data && data.session) {
+                    setUser(data.session.user);
+                    await fetchProfile(data.session.user);
+                }
+            } catch (err) {
+                console.error("Session initialization error:", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         getInitialSession();
@@ -87,7 +94,13 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {loading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafd' }}>
+                    <div style={{ fontFamily: 'sans-serif', color: '#1a237e', fontWeight: 'bold' }}>Loading Application...</div>
+                </div>
+            ) : (
+                children
+            )}
         </AuthContext.Provider>
     );
 };

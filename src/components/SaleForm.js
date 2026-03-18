@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, Grid, Paper, Typography, Select, MenuItem,
-  FormControl, InputLabel, Box, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, IconButton, Divider,
+  FormControl, Box, Table, TableBody, TableCell,
+  TableRow, IconButton, Divider,
   Checkbox, FormControlLabel, Card, CardContent, Chip, Tooltip, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 
-const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], workers = [] }) => {
+const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
   const { isAdmin } = useAuth();
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
@@ -36,6 +36,30 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
   const [saveStatus, setSaveStatus] = useState('');
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [lastSavedInvoice, setLastSavedInvoice] = useState(null);
+
+  // Billing Draft Consumption
+  useEffect(() => {
+    if (billingDraft) {
+      setInvoice(prev => ({
+        ...prev,
+        customer_name: billingDraft.customer_name || prev.customer_name,
+        vehicle_number: billingDraft.vehicle_number || prev.vehicle_number,
+        items: [
+          ...prev.items,
+          {
+            id: Date.now(),
+            type: 'service',
+            service_name: billingDraft.service_name,
+            details: billingDraft.details,
+            quantity: 1,
+            price: 0,
+            worker_id: billingDraft.worker_id
+          }
+        ]
+      }));
+      setBillingDraft(null);
+    }
+  }, [billingDraft, setBillingDraft]);
 
   // Draft Logic
   const handleSaveDraft = () => {
