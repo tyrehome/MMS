@@ -8,95 +8,70 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [role, setRole] = useState(null);
+    // Start as true — stays true until we have BOTH session + role resolved
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let mounted = true;
 
-        // Safety net: if loading hasn't resolved in 5s, force it to stop
-        const safetyTimeout = setTimeout(() => {
-            if (mounted) {
-                console.warn('AuthContext: session check timed out, forcing load complete.');
-                setLoading(false);
-            }
-        }, 5000);
-
-        // 1. Get initial session
-        const getInitialSession = async () => {
+        /**
+         * Fetch the user's role from the profiles table.
+         * Returns the role string, never throws.
+         */
+        const fetchRole = async (uid) => {
             try {
-                const { data, error } = await supabase.auth.getSession();
-                if (error) throw error;
-                
-                if (data && data.session) {
-                    setUser(data.session.user);
-                    await fetchProfile(data.session.user);
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', uid)
+                    .single();
+
+                if (error) {
+                    // PGRST116 = no row yet, default to staff
+                    return 'staff';
                 }
-            } catch (err) {
-                console.error("Session initialization error:", err);
-            } finally {
-                if (mounted) {
-                    clearTimeout(safetyTimeout);
-                    setLoading(false);
-                }
+                return data?.role || 'staff';
+            } catch {
+                return 'staff';
             }
         };
 
-        getInitialSession();
-
-        // 2. Listen for auth changes
-        const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(
+        /**
+         * onAuthStateChange is the SINGLE source of truth for session state.
+         * It fires immediately on mount with the current session (or null).
+         * We wait for fetchRole to finish BEFORE setting loading = false.
+         */
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
+                if (!mounted) return;
+
                 const currentUser = session?.user || null;
-                if (mounted) setUser(currentUser);
+                setUser(currentUser);
 
                 if (currentUser) {
-                    await fetchProfile(currentUser);
+                    // Wait for role BEFORE marking load complete
+                    const userRole = await fetchRole(currentUser.id);
+                    if (mounted) {
+                        setRole(userRole);
+                        setLoading(false);
+                    }
                 } else {
-                    if (mounted) setRole(null);
+                    // Logged out or no session
+                    setRole(null);
+                    setLoading(false);
                 }
-                if (mounted) setLoading(false);
             }
         );
 
         return () => {
             mounted = false;
-            clearTimeout(safetyTimeout);
-            authListener?.unsubscribe();
+            subscription?.unsubscribe();
         };
     }, []);
 
-    const fetchProfile = async (currentUser) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', currentUser.id)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    // No profile row yet — default to staff
-                    console.warn('No profile row found for user, defaulting to staff.');
-                    setRole('staff');
-                } else {
-                    console.error('Error fetching profile:', error);
-                    setRole('staff');
-                }
-            } else {
-                // Use whatever role is stored in the database (admin, staff, etc.)
-                setRole(data?.role || 'staff');
-            }
-        } catch (err) {
-            console.error('fetchProfile error:', err);
-            setRole('staff');
-        }
-    };
-
     const logout = async () => {
         await supabase.auth.signOut();
-        setUser(null);
-        setRole(null);
-        // Force a hard reload to clear all in-memory state and return to the login screen
+        // Hard reload clears all React state and returns to login screen
         window.location.reload();
     };
 
@@ -105,14 +80,33 @@ export const AuthProvider = ({ children }) => {
         role,
         isAdmin: role === 'admin',
         loading,
-        logout
+        logout,
     };
 
     return (
         <AuthContext.Provider value={value}>
             {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafd' }}>
-                    <div style={{ fontFamily: 'sans-serif', color: '#1a237e', fontWeight: 'bold' }}>Loading Application...</div>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: '100vh',
+                    background: '#f8fafd',
+                    gap: 16,
+                }}>
+                    <div style={{
+                        width: 40,
+                        height: 40,
+                        border: '4px solid #e8eaf6',
+                        borderTop: '4px solid #1a237e',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{ fontFamily: 'Outfit, sans-serif', color: '#1a237e', fontWeight: 700, fontSize: 16 }}>
+                        Loading Application...
+                    </div>
                 </div>
             ) : (
                 children
