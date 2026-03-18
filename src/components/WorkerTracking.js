@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { supabase } from '../supabaseClient';
 import ShopTalk from './ShopTalk';
 
-const WorkerTracking = ({ workersList = [], tasksList = [] }) => {
+const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, setSelectedComponent }) => {
   const [workers, setWorkers] = useState(workersList);
   const [tasks, setTasks] = useState(tasksList);
   const [tabValue, setTabValue] = useState(0);
