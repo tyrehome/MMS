@@ -67,15 +67,6 @@ export const AuthProvider = ({ children }) => {
 
     const fetchProfile = async (currentUser) => {
         try {
-            // Force admin for the owner
-            if (
-                currentUser.email?.toLowerCase() === 'sewwasofficial@gmail.com' ||
-                currentUser.email?.toLowerCase() === 'sewwasofficialz@gmail.com'
-            ) {
-                setRole('admin');
-                return;
-            }
-
             const { data, error } = await supabase
                 .from('profiles')
                 .select('role')
@@ -83,12 +74,20 @@ export const AuthProvider = ({ children }) => {
                 .single();
 
             if (error) {
-                console.error("Error fetching profile:", error);
-                setRole('staff');
+                if (error.code === 'PGRST116') {
+                    // No profile row yet — default to staff
+                    console.warn('No profile row found for user, defaulting to staff.');
+                    setRole('staff');
+                } else {
+                    console.error('Error fetching profile:', error);
+                    setRole('staff');
+                }
             } else {
+                // Use whatever role is stored in the database (admin, staff, etc.)
                 setRole(data?.role || 'staff');
             }
         } catch (err) {
+            console.error('fetchProfile error:', err);
             setRole('staff');
         }
     };
@@ -97,6 +96,8 @@ export const AuthProvider = ({ children }) => {
         await supabase.auth.signOut();
         setUser(null);
         setRole(null);
+        // Force a hard reload to clear all in-memory state and return to the login screen
+        window.location.reload();
     };
 
     const value = {

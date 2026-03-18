@@ -248,8 +248,8 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
     };
 
     const handleDeleteUser = async (userId, userEmail) => {
-        if (userEmail === 'sewwasofficial@gmail.com') {
-            setError('Cannot delete the system owner.');
+        if (userEmail === currentUser?.email) {
+            setError('You cannot remove your own account.');
             return;
         }
 
@@ -274,7 +274,10 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
     };
 
     const handleRoleToggle = async (user) => {
-        if (user.email === 'sewwasofficial@gmail.com') return;
+        if (user.email === currentUser?.email) {
+            setError('You cannot change your own role.');
+            return;
+        }
 
         const newRole = user.role === 'admin' ? 'staff' : 'admin';
         setSaving(true);
@@ -484,19 +487,20 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                                     </Box>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Chip
+                                                     <Chip
                                                         label={(u.role || 'staff').toUpperCase()}
                                                         size="small"
                                                         onClick={() => handleRoleToggle(u)}
-                                                        disabled={u.email === 'sewwasofficial@gmail.com'}
+                                                        disabled={u.email === currentUser?.email}
+                                                        title={u.email === currentUser?.email ? 'Cannot change your own role' : 'Click to toggle role'}
                                                         sx={{
                                                             fontWeight: 800,
                                                             fontSize: '10px',
                                                             bgcolor: u.role === 'admin' ? 'secondary.main' : 'rgba(0,0,0,0.06)',
                                                             color: u.role === 'admin' ? '#fff' : 'inherit',
                                                             borderRadius: 1,
-                                                            cursor: u.email === 'sewwasofficial@gmail.com' ? 'default' : 'pointer',
-                                                            '&:hover': u.email === 'sewwasofficial@gmail.com' ? {} : { bgcolor: u.role === 'admin' ? 'secondary.dark' : 'rgba(0,0,0,0.1)' }
+                                                            cursor: u.email === currentUser?.email ? 'default' : 'pointer',
+                                                            '&:hover': u.email === currentUser?.email ? {} : { bgcolor: u.role === 'admin' ? 'secondary.dark' : 'rgba(0,0,0,0.1)' }
                                                         }}
                                                     />
                                                 </TableCell>
@@ -504,7 +508,8 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleDeleteUser(u.id, u.email)}
-                                                        disabled={u.email === 'sewwasofficial@gmail.com' || u.email === currentUser?.email}
+                                                        disabled={u.email === currentUser?.email}
+                                                        title={u.email === currentUser?.email ? 'Cannot remove your own account' : 'Revoke access'}
                                                         color="error"
                                                         sx={{ bgcolor: 'rgba(244, 67, 54, 0.05)' }}
                                                     >
