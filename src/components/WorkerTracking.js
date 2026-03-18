@@ -66,7 +66,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
   };
 
   const completeTask = async (id) => {
-    await supabase.from('tasks').update({ status: 'Completed', completion_time: new Date().toISOString() }).eq('id', id);
+    await supabase.from('tasks').update({ status: 'Completed' }).eq('id', id);
     setSnackbar({ open: true, message: 'Mission achieved' });
   };
 

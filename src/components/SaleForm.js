@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 
-const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
+const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
   const { isAdmin } = useAuth();
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
@@ -82,9 +82,10 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
 
   const handleAddItem = () => {
     if (newItem.type === 'tire' && !newItem.tire_id) return;
+    if (newItem.type === 'part' && !newItem.part_id) return;
     if (newItem.type === 'service' && !newItem.service_name) return;
     setInvoice({ ...invoice, items: [...invoice.items, { ...newItem, id: Date.now() }] });
-    setNewItem({ type: 'tire', tire_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
+    setNewItem({ type: 'tire', tire_id: '', part_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
   };
 
   const calculateSubtotal = () => invoice.items.reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
@@ -242,13 +243,14 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
         <Grid item xs={12} md={7}>
           <Card sx={{ borderRadius: 4, minHeight: 600, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ p: 3, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Button variant={selectedCategory === 'tires' ? "contained" : "text"} onClick={() => setSelectedCategory('tires')} sx={{ fontWeight: 800, borderRadius: 2 }}>Products</Button>
+              <Button variant={selectedCategory === 'tires' ? "contained" : "text"} onClick={() => setSelectedCategory('tires')} sx={{ fontWeight: 800, borderRadius: 2 }}>Tires</Button>
+              <Button variant={selectedCategory === 'parts' ? "contained" : "text"} onClick={() => setSelectedCategory('parts')} sx={{ fontWeight: 800, borderRadius: 2 }}>Parts</Button>
               <Button variant={selectedCategory === 'services' ? "contained" : "text"} onClick={() => setSelectedCategory('services')} sx={{ fontWeight: 800, borderRadius: 2 }}>Services</Button>
               <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: 'auto', '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
             </Box>
             <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', maxHeight: 600 }}>
               <Grid container spacing={2}>
-                {selectedCategory === 'tires' ? tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+                {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
                   <Grid item xs={12} sm={6} md={4} key={t.id}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'tire', tire_id: t.id, price: t.price })} sx={{
                       cursor: 'pointer', borderRadius: 4,
@@ -266,7 +268,29 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
                       </CardContent>
                     </Card>
                   </Grid>
-                )) : services.map(s => (
+                ))}
+                
+                {selectedCategory === 'parts' && parts.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
+                  <Grid item xs={12} sm={6} md={4} key={p.id}>
+                    <Card onClick={() => setNewItem({ ...newItem, type: 'part', part_id: p.id, price: p.price })} sx={{
+                      cursor: 'pointer', borderRadius: 4,
+                      border: newItem.part_id === p.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      borderColor: newItem.part_id === p.id ? 'primary.main' : undefined,
+                      boxShadow: newItem.part_id === p.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
+                    }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{p.name}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{p.category}</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.price} {currency}</Typography>
+                          <Chip label={`Stock: ${p.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+
+                {selectedCategory === 'services' && services.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
                   <Grid item xs={12} sm={6} md={4} key={s}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'service', service_name: s })} sx={{
                       cursor: 'pointer', borderRadius: 4, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -337,7 +361,7 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
                     <TableRow key={item.id}>
                       <TableCell sx={{ py: 2 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
-                          {item.type === 'tire' ? tires.find(t => t.id === item.tire_id)?.brand : item.service_name}
+                          {item.type === 'tire' ? tires.find(t => t.id === item.tire_id)?.brand : item.type === 'part' ? parts.find(p => p.id === item.part_id)?.name : item.service_name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">{item.quantity} x {Number(item.price).toLocaleString()}</Typography>
                       </TableCell>
@@ -505,7 +529,7 @@ const SaleForm = ({ tires, addSale, masterData, businessProfile, accounts = [], 
                   {(lastSavedInvoice?.items || []).map(i => (
                     <tr key={i.id}>
                       <td>
-                        <strong>{i.type === 'tire' ? (tires || []).find(t => t.id === i.tire_id)?.brand : i.service_name}</strong>
+                        <strong>{i.type === 'tire' ? (tires || []).find(t => t.id === i.tire_id)?.brand : i.type === 'part' ? (parts || []).find(p => p.id === i.part_id)?.name : i.service_name}</strong>
                         {i.serial_number && <div style={{ fontSize: '8px' }}>SN: {i.serial_number}</div>}
                       </td>
                       <td align="right">{i.quantity}</td>

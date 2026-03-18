@@ -11,6 +11,16 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let mounted = true;
+
+        // Safety net: if loading hasn't resolved in 5s, force it to stop
+        const safetyTimeout = setTimeout(() => {
+            if (mounted) {
+                console.warn('AuthContext: session check timed out, forcing load complete.');
+                setLoading(false);
+            }
+        }, 5000);
+
         // 1. Get initial session
         const getInitialSession = async () => {
             try {
@@ -24,7 +34,10 @@ export const AuthProvider = ({ children }) => {
             } catch (err) {
                 console.error("Session initialization error:", err);
             } finally {
-                setLoading(false);
+                if (mounted) {
+                    clearTimeout(safetyTimeout);
+                    setLoading(false);
+                }
             }
         };
 
@@ -34,18 +47,20 @@ export const AuthProvider = ({ children }) => {
         const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 const currentUser = session?.user || null;
-                setUser(currentUser);
+                if (mounted) setUser(currentUser);
 
                 if (currentUser) {
                     await fetchProfile(currentUser);
                 } else {
-                    setRole(null);
+                    if (mounted) setRole(null);
                 }
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         );
 
         return () => {
+            mounted = false;
+            clearTimeout(safetyTimeout);
             authListener?.unsubscribe();
         };
     }, []);

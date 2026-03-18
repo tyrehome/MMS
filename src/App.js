@@ -433,7 +433,7 @@ const AppContent = () => {
 
     switch (selectedComponent) {
       case "Dashboard": 
-        return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
       
       case "InventoryHub": 
         return isAdmin ? (
@@ -442,10 +442,10 @@ const AppContent = () => {
             parts={parts || []} hotelTires={hotelTires || []} 
             {...commonProps} 
           />
-        ) : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+        ) : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
       
       case "SaleForm": 
-        return <SaleForm tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+        return <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
       
       case "CustomerCRM": 
         return <CustomerProfile 
@@ -458,12 +458,12 @@ const AppContent = () => {
         return <WorkerTracking workersList={workers || []} tasksList={tasks || []} setBillingDraft={setBillingDraft} setSelectedComponent={setSelectedComponent} {...commonProps} />;
       
       case "Finance": 
-        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
       
       case "Settings": 
-        return isAdmin ? <Settings {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Settings {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
       
-      default: return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      default: return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
     }
   };
 

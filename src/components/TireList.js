@@ -4,7 +4,7 @@ import {
   Snackbar, Button, Box, Grid, Select,
   MenuItem, FormControl, InputLabel,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
-  Divider, Autocomplete, Avatar, Card, Tab, Tabs, Alert
+  Divider, Autocomplete, Avatar, Card, Tab, Tabs, Alert, IconButton
 } from '@mui/material';
 import {
     Warning as WarningIcon,
@@ -12,7 +12,8 @@ import {
     LocalShipping as GRNIcon,
     Inventory2 as StockIcon,
     Build as PartsIcon,
-    Hotel as HotelIcon
+    Hotel as HotelIcon,
+    Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 import PartsInventory from './PartsInventory';
@@ -23,7 +24,7 @@ const TireList = ({
     parts = [], hotelTires = [], 
     masterData, businessProfile 
 }) => {
-  useAuth();
+  const { isAdmin } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('brand');
@@ -52,6 +53,17 @@ const TireList = ({
       setTabValue(0); // Go back to stock list
     } catch (err) {
       setAlert({ open: true, message: 'Failed to log GRN.', severity: 'error' });
+    }
+  };
+
+  const handleDeleteTire = async (id) => {
+    if (window.confirm('Delete this Trade-in Exchange item?')) {
+      try {
+        await deleteTire(id);
+        setAlert({ open: true, message: 'Item deleted successfully.', severity: 'info' });
+      } catch (err) {
+        setAlert({ open: true, message: 'Failed to delete item.', severity: 'error' });
+      }
     }
   };
 
@@ -120,6 +132,7 @@ const TireList = ({
                     <TableCell sx={{ fontWeight: 900 }}>CLASSIFICATION</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>STOCK QUANTUM</TableCell>
                     <TableCell sx={{ fontWeight: 900 }} align="right">UNIT RATE</TableCell>
+                    {isAdmin && <TableCell sx={{ fontWeight: 900 }} align="right">ACTIONS</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -142,6 +155,15 @@ const TireList = ({
                         </Box>
                       </TableCell>
                       <TableCell align="right"><Typography sx={{ fontWeight: 900 }}>{Number(tire.price).toLocaleString()} {currency}</Typography></TableCell>
+                      {isAdmin && (
+                        <TableCell align="right">
+                          {tire.brand === 'Trade-in Exchange' && (
+                            <IconButton color="error" size="small" onClick={() => handleDeleteTire(tire.id)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
