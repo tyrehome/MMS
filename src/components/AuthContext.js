@@ -178,7 +178,7 @@ export const AuthProvider = ({ children }) => {
             subscription?.unsubscribe();
             clearTimeout(globalTimeout);
         };
-    }, []);
+    }, [loading]);
 
     const logout = async () => {
         try {

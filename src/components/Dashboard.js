@@ -1,93 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Typography, Grid, Card, CardContent, Avatar, Modal,
+  Typography, Grid, Card, Avatar, Modal,
   IconButton, Box, Button, Collapse, Divider, Chip
 } from '@mui/material';
 import {
   AttachMoney as AttachMoneyIcon,
   TrendingUp as TrendingUpIcon, ShowChart as ShowChartIcon,
   Close as CloseIcon, Inventory as InventoryIcon,
-  Category as CategoryIcon, LocalShipping as LocalShippingIcon,
+  Category as CategoryIcon,
   Speed as SpeedIcon, TrendingDown as TrendingDownIcon,
   Analytics as AnalyticsIcon, ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Area, AreaChart
+  ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
 const COLORS = ['#1a237e', '#f50057', '#00c853', '#ff6d00', '#6200ea', '#00b8d4', '#ffd600', '#ff1744'];
 
-const StatCard = ({ stat }) => (
-  <Card
-    sx={{
-      bgcolor: 'background.paper',
-      color: 'text.primary',
-      borderRadius: 4,
-      boxShadow: '0 4px 25px rgba(0,0,0,0.03)',
-      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      '&:hover': {
-        transform: 'translateY(-6px)',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
-        '& .stat-icon': {
-          transform: 'scale(1.1) rotate(5deg)',
-          bgcolor: 'primary.main',
-          color: '#fff'
-        }
-      },
-      position: 'relative',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      border: '1px solid rgba(0,0,0,0.04)',
-    }}
-  >
-    <CardContent sx={{ p: 4, flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-        <Avatar 
-          className="stat-icon"
-          sx={{
-            bgcolor: 'primary.light',
-            color: 'primary.main',
-            width: 56,
-            height: 56,
-            borderRadius: 4,
-            transition: 'all 0.3s ease'
-          }}
-        >
-          {stat.icon}
-        </Avatar>
-        <TrendingUpIcon sx={{ color: 'success.main', opacity: 0.5, fontSize: 20 }} />
-      </Box>
-      <Box>
-        <Typography variant="subtitle2" sx={{
-          fontWeight: 800,
-          color: 'text.secondary',
-          textTransform: 'uppercase',
-          letterSpacing: '1.2px',
-          fontSize: '0.65rem',
-          mb: 0.5
-        }}>
-          {stat.label}
-        </Typography>
-        <Typography variant="h4" sx={{
-          fontWeight: 900,
-          color: 'text.primary',
-          letterSpacing: '-1px'
-        }}>
-          {stat.value}
-        </Typography>
-      </Box>
-    </CardContent>
-    <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.01)', borderTop: '1px solid rgba(0,0,0,0.03)' }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-            Updated just now
-        </Typography>
-    </Box>
-  </Card>
-);
 
 function Dashboard({ tires = [], sales = [], tasks = [], businessProfile }) {
   const currency = businessProfile?.currency || 'LKR';

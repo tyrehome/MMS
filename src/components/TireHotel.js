@@ -6,7 +6,6 @@ import {
 import { styled } from '@mui/material/styles';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
-    Edit as EditIcon,
     Add as AddIcon,
     Inventory as InventoryIcon,
     CheckCircle as ReleaseIcon,

@@ -6,9 +6,9 @@ import {
   Paper
 } from '@mui/material';
 import {
-  Person, DirectionsCar, Assessment, Hotel, 
+  Person, DirectionsCar, Hotel, 
   LocalPhone, Email, 
-  Receipt, TrendingUp, Warning, CalendarMonth, SettingsAccessibility,
+  Receipt, Warning, CalendarMonth, SettingsAccessibility,
   Add as AddIcon
 } from '@mui/icons-material';
 import { 

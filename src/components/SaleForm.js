@@ -304,7 +304,7 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                     }}>
                       <CardContent sx={{ p: 2 }}>
                         {t.images && t.images.length > 0 && (
-                          <Box sx={{ width: '100%', height: 100, borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                          <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
                             <img src={t.images[0]} alt={t.brand} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </Box>
                         )}
@@ -403,7 +403,7 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                       <TableCell sx={{ py: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {item.type === 'tire' && tires.find(t => t.id === item.tire_id)?.images?.[0] && (
-                            <img src={tires.find(t => t.id === item.tire_id).images[0]} alt="tire" style={{ width: 30, height: 30, borderRadius: 4, objectFit: 'cover' }} />
+                            <img src={tires.find(t => t.id === item.tire_id).images[0]} alt="tire" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover', aspectRatio: '1/1' }} />
                           )}
                           <Box>
                             <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>

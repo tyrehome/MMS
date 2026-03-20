@@ -24,7 +24,6 @@ import {
     Security as AuditIcon,
     CalendarToday as CalendarIcon,
     Receipt as ReceiptIcon,
-    Notifications as NotificationsIcon,
     Refresh as RefreshIcon
 } from '@mui/icons-material';
 

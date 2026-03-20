@@ -14,8 +14,7 @@ import {
     Build as PartsIcon,
     Hotel as HotelIcon,
     Delete as DeleteIcon,
-    AddPhotoAlternate as PhotoIcon,
-    DirectionsCar as VehicleIcon
+    AddPhotoAlternate as PhotoIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabaseClient';
@@ -95,7 +94,7 @@ const TireList = ({
       if (selectedFile) {
         const compressedBlob = await compressImage(selectedFile);
         const fileName = `${Date.now()}_${selectedFile.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('tires')
           .upload(fileName, compressedBlob);
         
