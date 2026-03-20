@@ -39,7 +39,6 @@ import PersonIcon from "@mui/icons-material/Person";
 import TireList from "./components/TireList";
 import Dashboard from "./components/Dashboard";
 import SaleForm from "./components/SaleForm";
-import "antd/dist/reset.css";
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import Login from "./components/Login";
 import { supabase } from "./supabaseClient";
@@ -145,17 +144,20 @@ const AppContent = () => {
     if (!user) return;
 
     const fetchData = async (table, setter) => {
-      const { data, error } = await supabase.from(table).select('*');
-      if (!error && data) setter(data);
+      try {
+        const { data, error } = await supabase.from(table).select('*');
+        if (!error && data) setter(data);
+      } catch (e) {
+        console.warn(`[Data] Failed to fetch ${table}:`, e.message);
+      }
     };
 
-    // Business Profile & Master Data
+    // --- PHASE 1: Priority Data (Dashboard & Business Config) ---
     const fetchBusinessSettings = async () => {
       const { data, error } = await supabase.from('business_settings').select('*').limit(1).maybeSingle();
       if (!error && data) setBusinessProfile(data);
     };
-    fetchBusinessSettings();
-
+    
     const fetchMasterData = async () => {
       const { data, error } = await supabase.from('master_data').select('*');
       if (!error && data) {
@@ -166,50 +168,67 @@ const AppContent = () => {
         setMasterData(formatted);
       }
     };
-    fetchMasterData();
 
-    // Data Fetches
-    fetchData('tires', setTires);
     const fetchSales = async () => {
       const { data, error } = await supabase.from('sales').select('*, sale_items(*)');
       if (!error && data) setSales(data);
     };
-    fetchSales();
-    fetchData('hotel_tires', setHotelTires);
-    fetchData('accounts', setAccounts);
-    fetchData('parts', setParts);
-    fetchData('customers', setCustomers);
-    fetchData('appointments', setAppointments);
-    fetchData('invoices', setInvoices);
-    fetchData('workers', setWorkers);
-    fetchData('tasks', setTasks);
-    fetchData('vehicles', setVehicles);
 
-    // Real-time Subscriptions
-    const channels = [
+    // Load mission-critical data immediately
+    Promise.all([
+      fetchBusinessSettings(),
+      fetchMasterData(),
+      fetchData('tires', setTires),
+      fetchSales()
+    ]);
+
+    // --- PHASE 2: Secondary Data (Deferred for 500ms to prioritize UI) ---
+    const secondaryTimer = setTimeout(() => {
+      fetchData('hotel_tires', setHotelTires);
+      fetchData('accounts', setAccounts);
+      fetchData('parts', setParts);
+      fetchData('customers', setCustomers);
+      fetchData('appointments', setAppointments);
+      fetchData('invoices', setInvoices);
+      fetchData('workers', setWorkers);
+      fetchData('tasks', setTasks);
+      fetchData('vehicles', setVehicles);
+    }, 500);
+
+    // --- REAL-TIME SUBSCRIPTIONS ---
+    const tables = [
       'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
       'customers', 'appointments', 'invoices', 'workers',
       'tasks', 'vehicles', 'business_settings', 'master_data'
-    ].map(table => {
+    ];
+
+    const channels = tables.map(table => {
       return supabase.channel(`public:${table}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+          // Optimized Refresh logic
           if (table === 'master_data') fetchMasterData();
-          else if (table === 'business_settings') fetchData(table, (data) => setBusinessProfile(prev => data[0] || prev));
+          else if (table === 'business_settings') fetchBusinessSettings();
           else if (table === 'sales') fetchSales();
-          else fetchData(table, (data) => {
+          else {
+            // Generic setter handler
             const setters = {
               tires: setTires, hotel_tires: setHotelTires,
               accounts: setAccounts, parts: setParts, customers: setCustomers,
               appointments: setAppointments, invoices: setInvoices,
               workers: setWorkers, tasks: setTasks, vehicles: setVehicles
             };
-            if (setters[table]) setters[table](data);
-          });
+            if (setters[table]) {
+              // Instead of full refetch, we could apply the delta, 
+              // but for now, full refetch is safer and we only do it on changes.
+              fetchData(table, setters[table]);
+            }
+          }
         })
         .subscribe();
     });
 
     return () => {
+      clearTimeout(secondaryTimer);
       channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [user]);
@@ -220,7 +239,7 @@ const AppContent = () => {
     if (user) {
       setUserProfile({
         name: user.email.split('@')[0].toUpperCase(),
-        role: role === 'admin' ? 'Administrator' : 'Staff',
+        role: role === 'admin' ? 'Administrator' : (role ? 'Staff' : 'Authorized User'),
         avatar: "",
       });
     }
@@ -345,8 +364,6 @@ const AppContent = () => {
     }
   };
 
-
-
   const handleDrawerToggle = () => setOpen(!open);
   const handleMenu = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -427,13 +444,13 @@ const AppContent = () => {
       </List>
     </div>
   );
-
   const renderComponent = () => {
     const commonProps = { businessProfile, masterData };
+    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
 
     switch (selectedComponent) {
       case "Dashboard": 
-        return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Dashboard tires={tires} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
       
       case "InventoryHub": 
         return isAdmin ? (
@@ -442,10 +459,10 @@ const AppContent = () => {
             parts={parts || []} hotelTires={hotelTires || []} 
             {...commonProps} 
           />
-        ) : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+        ) : posComponent;
       
       case "SaleForm": 
-        return <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+        return posComponent;
       
       case "CustomerCRM": 
         return <CustomerProfile 
@@ -458,12 +475,13 @@ const AppContent = () => {
         return <WorkerTracking workersList={workers || []} tasksList={tasks || []} setBillingDraft={setBillingDraft} setSelectedComponent={setSelectedComponent} {...commonProps} />;
       
       case "Finance": 
-        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : posComponent;
       
       case "Settings": 
-        return isAdmin ? <Settings {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+        return isAdmin ? <Settings {...commonProps} /> : posComponent;
       
-      default: return isAdmin ? <Dashboard tires={tires} sales={sales} {...commonProps} /> : <SaleForm parts={parts || []} tires={tires} addSale={addSale} accounts={accounts} workers={workers} {...commonProps} />;
+      default: 
+        return isAdmin ? <Dashboard tires={tires} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
     }
   };
 

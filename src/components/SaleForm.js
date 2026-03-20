@@ -18,11 +18,13 @@ import {
   Lock as LockIcon,
   SwapHoriz as SwapIcon,
   Print as PrintIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 
 const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
+  console.log('SaleForm Accounts:', accounts);
   const { isAdmin } = useAuth();
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
@@ -168,8 +170,9 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
           <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>POS & Billing Engine</Typography>
           <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>High-frequency transaction terminal with intelligent stock routing</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           {saveStatus && <Alert severity="info" sx={{ py: 0, px: 2, borderRadius: 2 }}>{saveStatus}</Alert>}
+          <IconButton color="primary" onClick={() => window.location.reload()} title="Reload Application"><RefreshIcon /></IconButton>
           <Button variant="outlined" onClick={handleLoadDraft} disabled={!localStorage.getItem('pos_draft_invoice')} sx={{ borderRadius: 3, px: 3 }}>Restore Draft</Button>
           <Button variant="outlined" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, px: 3 }}>History</Button>
         </Box>
@@ -248,62 +251,6 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
               <Button variant={selectedCategory === 'services' ? "contained" : "text"} onClick={() => setSelectedCategory('services')} sx={{ fontWeight: 800, borderRadius: 2 }}>Services</Button>
               <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: 'auto', '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
             </Box>
-            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', maxHeight: 600 }}>
-              <Grid container spacing={2}>
-                {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
-                  <Grid item xs={12} sm={6} md={4} key={t.id}>
-                    <Card onClick={() => setNewItem({ ...newItem, type: 'tire', tire_id: t.id, price: t.price })} sx={{
-                      cursor: 'pointer', borderRadius: 4,
-                      border: newItem.tire_id === t.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
-                      borderColor: newItem.tire_id === t.id ? 'primary.main' : undefined,
-                      boxShadow: newItem.tire_id === t.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
-                    }}>
-                      <CardContent sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{t.brand}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t.size}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
-                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{t.price} {currency}</Typography>
-                          <Chip label={`Stock: ${t.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-                
-                {selectedCategory === 'parts' && parts.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                  <Grid item xs={12} sm={6} md={4} key={p.id}>
-                    <Card onClick={() => setNewItem({ ...newItem, type: 'part', part_id: p.id, price: p.price })} sx={{
-                      cursor: 'pointer', borderRadius: 4,
-                      border: newItem.part_id === p.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
-                      borderColor: newItem.part_id === p.id ? 'primary.main' : undefined,
-                      boxShadow: newItem.part_id === p.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
-                    }}>
-                      <CardContent sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{p.name}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{p.category}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
-                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.price} {currency}</Typography>
-                          <Chip label={`Stock: ${p.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-
-                {selectedCategory === 'services' && services.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
-                  <Grid item xs={12} sm={6} md={4} key={s}>
-                    <Card onClick={() => setNewItem({ ...newItem, type: 'service', service_name: s })} sx={{
-                      cursor: 'pointer', borderRadius: 4, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: newItem.service_name === s ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
-                      borderColor: newItem.service_name === s ? 'primary.main' : undefined,
-                    }}>
-                      <Typography sx={{ fontWeight: 900 }}>{s}</Typography>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-
             {/* Item Config Bar */}
             <Box sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.01)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
               <Grid container spacing={2} alignItems="center">
@@ -342,6 +289,95 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                 <Grid item xs={2}>
                   <IconButton color="primary" onClick={handleAddItem} sx={{ bgcolor: 'primary.light', p: 1.5, borderRadius: 2 }}><AddIcon /></IconButton>
                 </Grid>
+              </Grid>
+            </Box>
+
+            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', maxHeight: 600 }}>
+              <Grid container spacing={2}>
+                {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+                  <Grid item xs={12} sm={6} md={4} key={t.id}>
+                    <Card onClick={() => setNewItem({ ...newItem, type: 'tire', tire_id: t.id, price: t.price })} sx={{
+                      cursor: 'pointer', borderRadius: 4,
+                      border: newItem.tire_id === t.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      borderColor: newItem.tire_id === t.id ? 'primary.main' : undefined,
+                      boxShadow: newItem.tire_id === t.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
+                    }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{t.brand}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t.size}</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{t.price} {currency}</Typography>
+                          <Chip label={`Stock: ${t.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
+                        </Box>
+                        <Button 
+                          fullWidth size="small" variant="contained" 
+                          startIcon={<AddIcon />} 
+                          sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire', tire_id: t.id, price: t.price, quantity: 1, id: Date.now() }] });
+                          }}
+                        >
+                          QUICK ADD
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+                
+                {selectedCategory === 'parts' && parts.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
+                  <Grid item xs={12} sm={6} md={4} key={p.id}>
+                    <Card onClick={() => setNewItem({ ...newItem, type: 'part', part_id: p.id, price: p.price })} sx={{
+                      cursor: 'pointer', borderRadius: 4,
+                      border: newItem.part_id === p.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      borderColor: newItem.part_id === p.id ? 'primary.main' : undefined,
+                      boxShadow: newItem.part_id === p.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
+                    }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{p.name}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{p.category}</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.price} {currency}</Typography>
+                          <Chip label={`Stock: ${p.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
+                        </Box>
+                        <Button 
+                          fullWidth size="small" variant="contained" 
+                          startIcon={<AddIcon />} 
+                          sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'part', part_id: p.id, price: p.price, quantity: 1, id: Date.now() }] });
+                          }}
+                        >
+                          QUICK ADD
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+
+                {selectedCategory === 'services' && services.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
+                  <Grid item xs={12} sm={6} md={4} key={s}>
+                    <Card onClick={() => setNewItem({ ...newItem, type: 'service', service_name: s })} sx={{
+                      cursor: 'pointer', borderRadius: 4, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: newItem.service_name === s ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      borderColor: newItem.service_name === s ? 'primary.main' : undefined,
+                    }}>
+                      <Typography sx={{ fontWeight: 900 }}>{s}</Typography>
+                      <Button 
+                        size="small" variant="contained" 
+                        startIcon={<AddIcon />} 
+                        sx={{ position: 'absolute', bottom: 4, right: 4, borderRadius: 2, fontSize: '0.6rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: s, price: 0, quantity: 1, id: Date.now() }] });
+                        }}
+                      >
+                        ADD
+                      </Button>
+                    </Card>
+                  </Grid>
+                ))}
               </Grid>
             </Box>
           </Card>

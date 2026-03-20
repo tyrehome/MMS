@@ -9,12 +9,10 @@ import {
 import {
   Add as AddIcon,
   CheckCircle as CheckCircleIcon,
-  People as PeopleIcon,
-  Chat as ChatIcon
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { supabase } from '../supabaseClient';
-import ShopTalk from './ShopTalk';
 
 const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, setSelectedComponent }) => {
   const [workers, setWorkers] = useState(workersList);
@@ -104,7 +102,6 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
         }}
       >
         <Tab icon={<PeopleIcon />} iconPosition="start" label="Personnel & Tasks" />
-        <Tab icon={<ChatIcon />} iconPosition="start" label="Team Messaging" />
       </Tabs>
 
       {tabValue === 0 && (
@@ -209,7 +206,6 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
         </Box>
       )}
 
-      {tabValue === 1 && <ShopTalk />}
 
       <Dialog open={isWorkerModalOpen} onClose={() => setIsWorkerModalOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
         <DialogTitle sx={{ fontWeight: 900 }}>Operative Onboarding</DialogTitle>

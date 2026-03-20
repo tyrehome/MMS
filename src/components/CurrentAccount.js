@@ -34,7 +34,9 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   
   const [accountDetails, setAccountDetails] = useState({ name: "", receivable: 0, payable: 0, category: 'Customer' });
-  const [transactionDetails, setTransactionDetails] = useState({ type: "receivable", amount: 0, description: "", date: new Date().toISOString().split("T")[0] });
+  const [transactionDetails, setTransactionDetails] = useState({ type: "payment_received", amount: 0, description: "", date: new Date().toISOString().split("T")[0] });
+  const [openStatement, setOpenStatement] = useState(false);
+  const [selectedAccountForStatement, setSelectedAccountForStatement] = useState(null);
 
   const currency = businessProfile?.currency || 'LKR';
 
@@ -83,14 +85,77 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
 
   const handleSaveTransaction = async () => {
     const acc = accounts.find(a => a.id === selectedAccountId);
-    if (!acc) return;
-    const updateData = {
-      [transactionDetails.type]: (parseFloat(acc[transactionDetails.type]) || 0) + parseFloat(transactionDetails.amount),
-      updated_at: new Date().toISOString()
+    if (!acc || !transactionDetails.amount) return;
+    
+    let updateData = { updated_at: new Date().toISOString() };
+    let typeLabel = "";
+    
+    // Logic for different transaction vectors
+    if (transactionDetails.type === 'payment_received') {
+      updateData.receivable = Math.max(0, (parseFloat(acc.receivable) || 0) - parseFloat(transactionDetails.amount));
+      typeLabel = "Payment Received";
+    } else if (transactionDetails.type === 'receivable_add') {
+      updateData.receivable = (parseFloat(acc.receivable) || 0) + parseFloat(transactionDetails.amount);
+      typeLabel = "Credit Charge";
+    } else if (transactionDetails.type === 'payment_made') {
+      updateData.payable = Math.max(0, (parseFloat(acc.payable) || 0) - parseFloat(transactionDetails.amount));
+      typeLabel = "Payment Made";
+    } else if (transactionDetails.type === 'payable_add') {
+      updateData.payable = (parseFloat(acc.payable) || 0) + parseFloat(transactionDetails.amount);
+      typeLabel = "Credit Purchase";
+    }
+
+    const transactionEntry = {
+      date: transactionDetails.date,
+      type: typeLabel,
+      amount: parseFloat(transactionDetails.amount),
+      description: transactionDetails.description || 'Manual Entry',
+      id: Date.now().toString()
     };
-    await supabase.from("accounts").update(updateData).eq('id', selectedAccountId);
-    setOpenTransactionDialog(false);
-    setSnackbar({ open: true, message: "Transaction journaled", severity: "success" });
+
+    const newTransactions = [...(acc.transactions || []), transactionEntry];
+    updateData.transactions = newTransactions;
+
+    try {
+      const { error } = await supabase.from("accounts").update(updateData).eq('id', selectedAccountId);
+      if (error) throw error;
+      
+      setOpenTransactionDialog(false);
+      setSnackbar({ open: true, message: "Ledger updated successfully", severity: "success" });
+      
+      // Local refresh
+      const { data: freshAccounts } = await supabase.from('accounts').select('*');
+      if (freshAccounts) setAccounts(freshAccounts);
+    } catch (err) {
+      console.error('Transaction error:', err);
+      setSnackbar({ open: true, message: "Failed to post transaction", severity: "error" });
+    }
+  };
+
+  const handleOpenStatement = (accId) => {
+    const acc = accounts.find(a => a.id === accId);
+    if (acc) {
+      setSelectedAccountForStatement(acc);
+      setOpenStatement(true);
+    }
+  };
+
+  const downloadStatement = (acc) => {
+    if (!acc) return;
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "bold");
+    doc.text(`STATEMENT OF ACCOUNT: ${acc.name}`, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Current Receivable: ${acc.receivable} ${currency}`, 14, 30);
+    doc.text(`Current Payable: ${acc.payable} ${currency}`, 14, 35);
+    
+    const tableData = (acc.transactions || []).map(t => [t.date, t.type, t.description, t.amount.toLocaleString()]);
+    doc.autoTable({
+      head: [["Date", "Type", "Description", "Amount"]],
+      body: tableData,
+      startY: 45
+    });
+    doc.save(`Statement_${acc.name}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const handleDownloadInvoice = (inv) => {
@@ -265,18 +330,26 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openTransactionDialog} onClose={() => setOpenTransactionDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Manual Journal Entry</DialogTitle>
+      <Dialog open={openTransactionDialog} onClose={() => setOpenTransactionDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2, minWidth: 400 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Journal Entry: {accounts.find(a => a.id === selectedAccountId)?.name}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
           <FormControl fullWidth>
-            <InputLabel>Transaction Vector</InputLabel>
-            <Select value={transactionDetails.type} label="Transaction Vector" onChange={(e) => setTransactionDetails({ ...transactionDetails, type: e.target.value })}>
-                <MenuItem value="receivable">Add to Receivable (+)</MenuItem>
-                <MenuItem value="payable">Add to Payable (+)</MenuItem>
+            <InputLabel>Transaction Type</InputLabel>
+            <Select 
+              value={transactionDetails.type} 
+              label="Transaction Type" 
+              onChange={(e) => setTransactionDetails({ ...transactionDetails, type: e.target.value })}
+            >
+                <MenuItem value="payment_received">Payment Received (Reduce Receivable)</MenuItem>
+                <MenuItem value="receivable_add">Additional Credit (Increase Receivable)</MenuItem>
+                <Divider />
+                <MenuItem value="payment_made">Payment Made (Reduce Payable)</MenuItem>
+                <MenuItem value="payable_add">Credit Purchase (Increase Payable)</MenuItem>
             </Select>
           </FormControl>
-          <TextField label="Quantum / Amount" type="number" fullWidth variant="outlined" value={transactionDetails.amount} onChange={e => setTransactionDetails({ ...transactionDetails, amount: parseFloat(e.target.value) || 0 })} />
-          <TextField label="Description / Memo" fullWidth variant="outlined" multiline rows={2} value={transactionDetails.description} onChange={e => setTransactionDetails({ ...transactionDetails, description: e.target.value })} />
+          <TextField label="Transaction Date" type="date" fullWidth value={transactionDetails.date} onChange={e => setTransactionDetails({ ...transactionDetails, date: e.target.value })} InputLabelProps={{ shrink: true }} />
+          <TextField label="Amount" type="number" fullWidth variant="outlined" value={transactionDetails.amount} onChange={e => setTransactionDetails({ ...transactionDetails, amount: e.target.value })} />
+          <TextField label="Notes / Memo" fullWidth variant="outlined" multiline rows={2} value={transactionDetails.description} onChange={e => setTransactionDetails({ ...transactionDetails, description: e.target.value })} />
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setOpenTransactionDialog(false)}>Cancel</Button>
@@ -284,9 +357,47 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
         </DialogActions>
       </Dialog>
 
+      <Dialog open={openStatement} onClose={() => setOpenStatement(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Account Statement: {selectedAccountForStatement?.name}
+          <Button startIcon={<PictureAsPdfIcon />} onClick={() => downloadStatement(selectedAccountForStatement)} size="small">Export PDF</Button>
+        </DialogTitle>
+        <DialogContent>
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 900 }}>DATE</TableCell>
+                  <TableCell sx={{ fontWeight: 900 }}>TYPE</TableCell>
+                  <TableCell sx={{ fontWeight: 900 }}>DESCRIPTION</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(!selectedAccountForStatement?.transactions || selectedAccountForStatement.transactions.length === 0) ? (
+                  <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4, opacity: 0.6 }}>No transaction history found</TableCell></TableRow>
+                ) : (
+                  [...selectedAccountForStatement.transactions].reverse().map((t, i) => (
+                    <TableRow key={i} hover>
+                      <TableCell>{t.date}</TableCell>
+                      <TableCell><Chip label={t.type} size="small" variant="outlined" sx={{ fontWeight: 700 }} /></TableCell>
+                      <TableCell>{t.description}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>{t.amount?.toLocaleString()} {currency}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenStatement(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         {isAdmin && <MenuItem onClick={() => { setOpenTransactionDialog(true); setAnchorEl(null); }}>Post Manual Transaction</MenuItem>}
-        <MenuItem onClick={() => { setAnchorEl(null); }}>View Statement</MenuItem>
+        <MenuItem onClick={() => { handleOpenStatement(selectedAccountId); setAnchorEl(null); }}>View Statement</MenuItem>
         {isAdmin && <Divider />}
         {isAdmin && <MenuItem onClick={() => { setAnchorEl(null); }} sx={{ color: 'error.main' }}>Close Ledger</MenuItem>}
       </Menu>
