@@ -75,30 +75,35 @@ export const AuthProvider = ({ children }) => {
                 const userEmail = (currentUser.email || '').toLowerCase().trim();
                 const isOwner = ownerEmails.some(email => userEmail === email);
 
-                // LAYER 1: Immediate Bypass for Owner
-                if (isOwner) {
-                    console.info('[Auth] Owner bypass active for:', userEmail);
+                // Check for role in app_metadata (synced via DB trigger)
+                const metadataRole = currentUser.app_metadata?.role;
+
+                // LAYER 1: Immediate Bypass for Owner OR metadata claim
+                if (isOwner || metadataRole) {
+                    const finalRole = isOwner ? 'admin' : (metadataRole || 'staff');
+                    console.info(`[Auth] role resolved via ${isOwner ? 'Owner Bypass' : 'JWT Metadata'}:`, finalRole);
                     setUser(currentUser);
-                    setRole('admin');
+                    setRole(finalRole);
                     setLoading(false);
-                    // Continue with repair in background (non-blocking)
+                    
+                    // Background repair to ensure profiles table is in sync
                     (async () => {
                         try {
                             const { data: profile } = await supabase.from('profiles').select('id, role').eq('id', currentUser.id).maybeSingle();
-                            if (!profile || profile.role !== 'admin') {
+                            if (!profile || profile.role !== finalRole) {
                                 await supabase.from('profiles').upsert({
                                     id: currentUser.id,
                                     email: userEmail,
-                                    role: 'admin',
-                                    name: 'ADMIN_BYPASS'
+                                    role: finalRole,
+                                    name: profile?.name || userEmail.split('@')[0].toUpperCase()
                                 });
                             }
-                            localStorage.setItem(ROLE_CACHE_KEY, 'admin');
+                            localStorage.setItem(ROLE_CACHE_KEY, finalRole);
                         } catch (e) {
-                            console.warn('[Auth] Background repair failed (non-critical):', e.message);
+                            console.warn('[Auth] Background sync failed (non-critical):', e.message);
                         }
                     })();
-                    return; // EXIT EARLY: User is unlocked as admin
+                    return;
                 }
 
                 // LAYER 2: Optimistic UI for others via Cache
