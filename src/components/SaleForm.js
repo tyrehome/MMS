@@ -303,6 +303,11 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                       boxShadow: newItem.tire_id === t.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
                     }}>
                       <CardContent sx={{ p: 2 }}>
+                        {t.images && t.images.length > 0 && (
+                          <Box sx={{ width: '100%', height: 100, borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                            <img src={t.images[0]} alt={t.brand} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </Box>
+                        )}
                         <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{t.brand}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t.size}</Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
@@ -396,10 +401,17 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                   {invoice.items.map(item => (
                     <TableRow key={item.id}>
                       <TableCell sx={{ py: 2 }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
-                          {item.type === 'tire' ? tires.find(t => t.id === item.tire_id)?.brand : item.type === 'part' ? parts.find(p => p.id === item.part_id)?.name : item.service_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">{item.quantity} x {Number(item.price).toLocaleString()}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {item.type === 'tire' && tires.find(t => t.id === item.tire_id)?.images?.[0] && (
+                            <img src={tires.find(t => t.id === item.tire_id).images[0]} alt="tire" style={{ width: 30, height: 30, borderRadius: 4, objectFit: 'cover' }} />
+                          )}
+                          <Box>
+                            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                              {item.type === 'tire' ? tires.find(t => t.id === item.tire_id)?.brand : item.type === 'part' ? parts.find(p => p.id === item.part_id)?.name : item.service_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">{item.quantity} x {Number(item.price).toLocaleString()}</Typography>
+                          </Box>
+                        </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 900 }}>{(item.quantity * item.price).toLocaleString()}</TableCell>
                       <TableCell align="right">

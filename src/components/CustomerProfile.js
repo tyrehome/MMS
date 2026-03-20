@@ -8,9 +8,15 @@ import {
 import {
   Person, DirectionsCar, Assessment, Hotel, 
   LocalPhone, Email, 
-  Receipt, TrendingUp, Warning, CalendarMonth, SettingsAccessibility
+  Receipt, TrendingUp, Warning, CalendarMonth, SettingsAccessibility,
+  Add as AddIcon
 } from '@mui/icons-material';
+import { 
+  Dialog, DialogTitle, DialogContent, DialogActions, 
+  Snackbar, Alert 
+} from '@mui/material';
 import { format } from 'date-fns';
+import { supabase } from '../supabaseClient';
 import AppointmentSystem from './AppointmentSystem';
 import VehicleTracking from './VehicleTracking';
 
@@ -27,6 +33,9 @@ const CustomerProfile = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [tabLevel1, setTabLevel1] = useState(0);
   const [tabLevel2, setTabLevel2] = useState(0);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', vehicle_number: '' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const filteredCustomers = customers.filter(c => 
     c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -34,6 +43,22 @@ const CustomerProfile = ({
   );
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+
+  const handleRegister = async () => {
+    if (!newCustomer.name || !newCustomer.phone) {
+        setSnackbar({ open: true, message: 'Name and Phone are mandatory.', severity: 'error' });
+        return;
+    }
+    try {
+        const { error } = await supabase.from('customers').insert([newCustomer]);
+        if (error) throw error;
+        setIsRegisterOpen(false);
+        setNewCustomer({ name: '', phone: '', email: '', vehicle_number: '' });
+        setSnackbar({ open: true, message: 'Client intelligence profile created.', severity: 'success' });
+    } catch (err) {
+        setSnackbar({ open: true, message: 'Registry failure: ' + err.message, severity: 'error' });
+    }
+  };
 
   // Aggregated Data for selected customer
   const customerVehicles = vehicles.filter(v => v.customer_name === selectedCustomer?.name);
@@ -84,6 +109,15 @@ const CustomerProfile = ({
                     sx: { borderRadius: 3 }
                   }}
                 />
+                <Button 
+                    fullWidth 
+                    variant="contained" 
+                    startIcon={<AddIcon />} 
+                    onClick={() => setIsRegisterOpen(true)}
+                    sx={{ mt: 2, borderRadius: 3, fontWeight: 900 }}
+                >
+                    REGISTER CLIENT
+                </Button>
               </Box>
               <Divider />
               <List sx={{ overflowY: 'auto', flexGrow: 1, p: 0 }}>
@@ -286,6 +320,24 @@ const CustomerProfile = ({
 
       {tabLevel1 === 1 && <AppointmentSystem appointmentsList={appointments} vehiclesList={vehicles} />}
       {tabLevel1 === 2 && <VehicleTracking vehiclesList={vehicles} businessProfile={businessProfile} />}
+
+      <Dialog open={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Client Intelligence Registration</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+            <TextField fullWidth label="Full Name" variant="standard" value={newCustomer.name} onChange={e => setNewCustomer({...newCustomer, name: e.target.value})} required />
+            <TextField fullWidth label="Contact Number" variant="standard" value={newCustomer.phone} onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})} required />
+            <TextField fullWidth label="Email Address" variant="standard" value={newCustomer.email} onChange={e => setNewCustomer({...newCustomer, email: e.target.value})} />
+            <TextField fullWidth label="Primary Vehicle Number" variant="standard" value={newCustomer.vehicle_number} onChange={e => setNewCustomer({...newCustomer, vehicle_number: e.target.value})} />
+        </DialogContent>
+        <DialogActions sx={{ p: 4, pt: 1 }}>
+            <Button onClick={() => setIsRegisterOpen(false)}>Abort</Button>
+            <Button variant="contained" onClick={handleRegister} sx={{ borderRadius: 3, fontWeight: 900, px: 4 }}>SYNC & PROTOCOL</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({...snackbar, open: false})}>
+        <Alert severity={snackbar.severity} sx={{ borderRadius: 3, fontWeight: 700 }}>{snackbar.message}</Alert>
+      </Snackbar>
     </Box>
   );
 };
