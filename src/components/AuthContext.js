@@ -68,7 +68,8 @@ export const AuthProvider = ({ children }) => {
                 'sewwasofficial@gmail.com',
                 'sewwas@gmail.com',
                 'sewwa.mms@gmail.com',
-                'sewwa.tms@gmail.com'
+                'sewwa.tms@gmail.com',
+                'mmstyrehome@gmail.com'
             ];
             
             if (currentUser) {
@@ -103,7 +104,9 @@ export const AuthProvider = ({ children }) => {
                             console.warn('[Auth] Background sync failed (non-critical):', e.message);
                         }
                     })();
-                    return;
+
+                    // Only return early for Owners. Others proceed to LAYER 3 to verify against DB.
+                    if (isOwner) return;
                 }
 
                 // LAYER 2: Optimistic UI for others via Cache
