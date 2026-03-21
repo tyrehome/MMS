@@ -35,7 +35,12 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
 
     const handleAddPart = async (e) => {
         if (e) e.preventDefault();
-        await supabase.from('parts').insert([{ ...newPart, created_at: new Date().toISOString() }]);
+        await supabase.from('parts').insert([{ 
+            ...newPart, 
+            stock: parseInt(newPart.stock || 0),
+            price: parseFloat(newPart.price || 0),
+            created_at: new Date().toISOString() 
+        }]);
         setNewPart({ name: '', category: 'Consumable', stock: 0, price: 0 });
     };
 
@@ -44,7 +49,12 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
     };
 
     const handleEditSave = async () => {
-        await supabase.from('parts').update({ ...editPart, updated_at: new Date().toISOString() }).eq('id', editPart.id);
+        await supabase.from('parts').update({ 
+            name: editPart.name,
+            category: editPart.category,
+            stock: parseInt(editPart.stock || 0),
+            price: parseFloat(editPart.price || 0)
+        }).eq('id', editPart.id);
         setIsEditDialogOpen(false);
     };
 
@@ -70,8 +80,8 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                         <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>Register Component</Typography>
                         <form onSubmit={handleAddPart}>
                             <Grid container spacing={2}>
-                                <Grid item xs={12} sm={4}><TextField fullWidth label="Designation" value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})} variant="standard" /></Grid>
-                                <Grid item xs={12} sm={3}>
+                                <Grid item xs={12} sm={4}><TextField fullWidth label="Designation" value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})} variant="standard" required /></Grid>
+                                <Grid item xs={12} sm={2}>
                                     <FormControl fullWidth variant="standard">
                                         <InputLabel>Category</InputLabel>
                                         <Select value={newPart.category} onChange={e => setNewPart({...newPart, category: e.target.value})}>
@@ -79,8 +89,9 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={12} sm={2}><TextField fullWidth label="Qty" type="number" value={newPart.stock} onChange={e => setNewPart({...newPart, stock: e.target.value})} variant="standard" /></Grid>
-                                <Grid item xs={12} sm={3}><Button fullWidth variant="contained" type="submit" sx={{ height: 48, borderRadius: 3, fontWeight: 900 }}>APPEND</Button></Grid>
+                                <Grid item xs={12} sm={2}><TextField fullWidth label="Qty" type="number" value={newPart.stock} onChange={e => setNewPart({...newPart, stock: e.target.value})} variant="standard" required /></Grid>
+                                <Grid item xs={12} sm={2}><TextField fullWidth label={`Rate (${currency})`} type="number" value={newPart.price} onChange={e => setNewPart({...newPart, price: e.target.value})} variant="standard" required /></Grid>
+                                <Grid item xs={12} sm={2}><Button fullWidth variant="contained" type="submit" sx={{ height: 48, borderRadius: 3, fontWeight: 900 }}>APPEND</Button></Grid>
                             </Grid>
                         </form>
                     </Card>
