@@ -54,7 +54,7 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
             service_name: billingDraft.service_name,
             details: billingDraft.details,
             quantity: 1,
-            price: 0,
+            price: billingDraft.price || 0,
             worker_id: billingDraft.worker_id
           }
         ]

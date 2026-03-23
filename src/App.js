@@ -22,7 +22,6 @@ import {
   Menu,
   MenuItem,
   Fade,
-  Badge,
   Button,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
@@ -31,7 +30,6 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import SellIcon from "@mui/icons-material/Sell";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
 import InventoryIcon from "@mui/icons-material/Inventory";
@@ -245,7 +243,6 @@ const AppContent = () => {
     }
   }, [user, role]);
 
-  const [notifications] = useState(3);
   const isMobile = useMediaQuery("(max-width:600px)");
 
   useEffect(() => {
@@ -525,7 +522,6 @@ const AppContent = () => {
               >
                 QUICK POS
               </Button>
-              <IconButton color="inherit" sx={{ mr: 1 }}><Badge badgeContent={notifications} color="secondary"><NotificationsIcon /></Badge></IconButton>
               <Tooltip title="Account Settings">
                 <IconButton onClick={handleMenu} sx={{ p: 0.5 }}>
                   <Avatar

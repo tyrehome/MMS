@@ -30,6 +30,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
     details: '', 
     customer_name: '', 
     vehicle_number: '',
+    price: '',
     date: format(new Date(), 'yyyy-MM-dd'), 
     time: format(new Date(), 'HH:mm') 
   });
@@ -57,6 +58,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
       details: '', 
       customer_name: '', 
       vehicle_number: '',
+      price: '',
       date: format(new Date(), 'yyyy-MM-dd'), 
       time: format(new Date(), 'HH:mm') 
     });
@@ -74,6 +76,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
       vehicle_number: task.vehicle_number,
       service_name: task.task,
       details: task.details,
+      price: task.price,
       worker_id: task.worker_id
     });
     setSelectedComponent("SaleForm");
@@ -230,6 +233,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
             </FormControl>
             <TextField fullWidth sx={{ mt: 1 }} label="Customer Name" value={taskFormData.customer_name} onChange={e => setTaskFormData({...taskFormData, customer_name: e.target.value})} />
             <TextField fullWidth sx={{ mt: 1 }} label="Vehicle Number" value={taskFormData.vehicle_number} onChange={e => setTaskFormData({...taskFormData, vehicle_number: e.target.value})} />
+            <TextField fullWidth sx={{ mt: 1 }} type="number" label="Estimated Price (LKR)" value={taskFormData.price} onChange={e => setTaskFormData({...taskFormData, price: e.target.value})} />
             <TextField fullWidth sx={{ mt: 1 }} multiline rows={3} label="Technical Details" value={taskFormData.details} onChange={e => setTaskFormData({...taskFormData, details: e.target.value})} />
             <Button variant="contained" fullWidth size="large" onClick={handleTaskSubmit} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>AUTHORIZE DEPLOYMENT</Button>
         </DialogContent>
