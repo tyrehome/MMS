@@ -20,7 +20,7 @@ import {
 const COLORS = ['#1a237e', '#f50057', '#00c853', '#ff6d00', '#6200ea', '#00b8d4', '#ffd600', '#ff1744'];
 
 
-function Dashboard({ tires = [], sales = [], tasks = [], businessProfile }) {
+function Dashboard({ tires = [], parts = [], sales = [], tasks = [], businessProfile }) {
   const currency = businessProfile?.currency || 'LKR';
   const [expanded, setExpanded] = useState(false);
   const [dataHealthOpen, setDataHealthOpen] = useState(false);
@@ -69,16 +69,33 @@ function Dashboard({ tires = [], sales = [], tasks = [], businessProfile }) {
       }
     });
 
-    const totalFieldsCheck = (tires.length * 4) + (sales.length * 2);
+    // Parts Analysis
+    parts.forEach(p => {
+      const missingFields = [];
+      if (!p.category) missingFields.push('Category');
+      if (!p.price || p.price === 0) missingFields.push('Selling Price');
+      
+      if (missingFields.length > 0) {
+        missingDataCount++;
+        missingRecords.push({ type: 'Part', id: p.id, label: p.name, missing: missingFields });
+      }
+    });
+
+    const totalFieldsCheck = (tires.length * 4) + (sales.length * 2) + (parts.length * 2);
     const healthScore = totalFieldsCheck > 0 ? Math.max(0, 100 - (missingDataCount / totalFieldsCheck * 100)) : 100;
     const revChange = yesterdayRev > 0 ? ((todayRev - yesterdayRev) / yesterdayRev) * 100 : (todayRev > 0 ? 100 : 0);
 
     return { todayRev, yesterdayRev, revChange, healthScore, missingRecords };
-  }, [tires, sales]);
+  }, [tires, sales, parts]);
 
   const statistics = useMemo(() => {
     const totalTires = tires.reduce((sum, tire) => sum + (Number(tire.stock) || 0), 0);
-    const totalValue = tires.reduce((sum, tire) => sum + ((Number(tire.price) || 0) * (Number(tire.stock) || 0)), 0);
+    const totalParts = parts.reduce((sum, part) => sum + (Number(part.stock) || 0), 0);
+    
+    const tireValue = tires.reduce((sum, tire) => sum + ((Number(tire.price) || 0) * (Number(tire.stock) || 0)), 0);
+    const partValue = parts.reduce((sum, part) => sum + ((Number(part.price) || 0) * (Number(part.stock) || 0)), 0);
+    const totalValue = tireValue + partValue;
+    
     const totalSales = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
     const totalProfit = sales.reduce((sum, sale) => sum + (Number(sale.profit) || 0), 0);
     const uniqueBrands = new Set(tires.map(tire => tire.brand).filter(Boolean)).size;
@@ -88,13 +105,13 @@ function Dashboard({ tires = [], sales = [], tasks = [], businessProfile }) {
       { icon: <AttachMoneyIcon />, label: "Today's Revenue", value: `${insights.todayRev.toLocaleString()} ${currency}`, sub: `${insights.revChange >= 0 ? '+' : ''}${insights.revChange.toFixed(1)}% vs yesterday` },
       { icon: <AnalyticsIcon />, label: "Data Health Score", value: `${insights.healthScore.toFixed(0)}%`, sub: `${insights.missingRecords.length} items need attention`, action: () => setDataHealthOpen(true) },
       { icon: <SpeedIcon />, label: 'Active Workshop', value: `${activeTasks} Tasks`, sub: 'Ready for processing' },
-      { icon: <InventoryIcon />, label: 'Total Inventory', value: `${totalTires.toLocaleString()} Units`, sub: `Across ${uniqueBrands} brands` },
+      { icon: <InventoryIcon />, label: 'Total Inventory', value: `${(totalTires + totalParts).toLocaleString()} Units`, sub: `Tires & Spare Parts` },
       { icon: <TrendingUpIcon />, label: 'Total Revenue', value: `${totalSales.toLocaleString()} ${currency}` },
       { icon: <ShowChartIcon />, label: 'Net Profit', value: `${totalProfit.toLocaleString()} ${currency}` },
       { icon: <CategoryIcon />, label: 'Brand Portfolio', value: uniqueBrands },
       { icon: <TrendingDownIcon />, label: 'Stock Value', value: `${totalValue.toLocaleString()} ${currency}` },
     ];
-  }, [tires, sales, tasks, insights, currency]);
+  }, [tires, parts, sales, tasks, insights, currency]);
 
   const salesData = useMemo(() =>
     sales.map(sale => ({
@@ -265,6 +282,70 @@ function Dashboard({ tires = [], sales = [], tasks = [], businessProfile }) {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Parts Detail Section at Bottom */}
+      <Box sx={{ mt: 6, mb: 4 }}>
+        <Typography variant="h5" sx={{ fontWeight: 900, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CategoryIcon color="primary" /> Spare Parts Detailed Intelligence
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Granular breakdown of all available consumable and automotive parts.
+        </Typography>
+
+        <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+          <Box sx={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'rgba(26, 35, 126, 0.05)', color: '#1a237e' }}>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>ITEM / PART NAME</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>CATEGORY</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>ON-HAND STOCK</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>BUYING COST</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>SELLING PRICE</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>MARGIN / UNIT</th>
+                  <th style={{ padding: '16px', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>TOTAL VALUE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parts.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: '#666', fontWeight: 600 }}>
+                      No parts inventory recorded. Items will appear here when you log a Parts GRN.
+                    </td>
+                  </tr>
+                ) : (
+                  [...parts].sort((a, b) => b.stock - a.stock).map((part, index) => {
+                    const margin = Number(part.price) - Number(part.cost_price || 0);
+                    const marginPct = Number(part.price) > 0 ? (margin / Number(part.price)) * 100 : 0;
+                    const stockValue = Number(part.stock) * Number(part.price);
+                    
+                    return (
+                      <tr key={part.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', backgroundColor: index % 2 === 0 ? '#fff' : '#fcfcfc' }}>
+                        <td style={{ padding: '16px', fontWeight: 800, color: '#333' }}>{part.name}</td>
+                        <td style={{ padding: '16px' }}>
+                          <Chip label={part.category} size="small" sx={{ fontWeight: 800, bgcolor: 'rgba(245,0,87,0.1)', color: 'secondary.main', borderRadius: 1.5 }} />
+                        </td>
+                        <td style={{ padding: '16px' }}>
+                          <Chip label={`${part.stock} Units`} size="small" color={part.stock <= 5 ? "error" : "success"} sx={{ fontWeight: 900 }} />
+                        </td>
+                        <td style={{ padding: '16px', fontWeight: 600, color: '#666' }}>{Number(part.cost_price || 0).toLocaleString()} {currency}</td>
+                        <td style={{ padding: '16px', fontWeight: 900, color: '#1a237e' }}>{Number(part.price || 0).toLocaleString()} {currency}</td>
+                        <td style={{ padding: '16px' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography sx={{ fontWeight: 900, color: margin > 0 ? 'success.main' : 'error.main', fontSize: '0.9rem' }}>+{margin.toLocaleString()} {currency}</Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>{marginPct.toFixed(0)}% Margin</Typography>
+                          </Box>
+                        </td>
+                        <td style={{ padding: '16px', fontWeight: 900 }}>{stockValue.toLocaleString()} {currency}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </Box>
+        </Card>
+      </Box>
 
       {/* Data Health Modal */}
       <Modal open={dataHealthOpen} onClose={() => setDataHealthOpen(false)}>

@@ -99,6 +99,16 @@ CREATE TABLE IF NOT EXISTS public.customers (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    payable_balance NUMERIC DEFAULT 0,
+    transactions JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- SALES & ACCOUNTING
 CREATE TABLE IF NOT EXISTS public.sales (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -107,7 +117,9 @@ CREATE TABLE IF NOT EXISTS public.sales (
     payment_method TEXT,
     customer_name TEXT,
     vehicle_number TEXT,
-    profit NUMERIC DEFAULT 0
+    profit NUMERIC DEFAULT 0,
+    discount_amount NUMERIC DEFAULT 0,
+    discount_type TEXT DEFAULT 'Fixed'
 );
 
 CREATE TABLE IF NOT EXISTS public.sale_items (
@@ -137,6 +149,17 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     amount NUMERIC DEFAULT 0,
     date TIMESTAMPTZ DEFAULT NOW(),
     status TEXT DEFAULT 'unpaid'
+);
+
+CREATE TABLE IF NOT EXISTS public.quotations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name TEXT,
+    vehicle_number TEXT,
+    total NUMERIC DEFAULT 0,
+    items JSONB DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'draft',
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.appointments (
@@ -209,6 +232,16 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS details TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS date TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS time TEXT;
 
+-- Parts cost price for profit tracking
+ALTER TABLE public.parts ADD COLUMN IF NOT EXISTS cost_price NUMERIC DEFAULT 0;
+
+-- Link inventory to suppliers for GRN tracking
+ALTER TABLE public.tires ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public.parts ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL;
+
+-- Vendor Ledger
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS transactions JSONB DEFAULT '[]'::jsonb;
+
 -- RPC FUNCTION FOR ATOMIC SALES PROCESSING
 CREATE OR REPLACE FUNCTION process_sale(sale_payload JSONB)
 RETURNS JSONB
@@ -264,7 +297,7 @@ BEGIN
     END IF;
 
     -- 3. Save Sale Record
-    INSERT INTO public.sales (total, payment_method, account_id, customer_name, vehicle_number, profit, created_at)
+    INSERT INTO public.sales (total, payment_method, account_id, customer_name, vehicle_number, profit, discount_amount, discount_type, created_at)
     VALUES (
         (sale_payload->>'total')::NUMERIC, 
         sale_payload->>'payment_method', 
@@ -272,6 +305,8 @@ BEGIN
         sale_payload->>'customer_name', 
         sale_payload->>'vehicle_number', 
         COALESCE((sale_payload->>'profit')::NUMERIC, (sale_payload->>'total')::NUMERIC * 0.25), 
+        COALESCE((sale_payload->>'discount_amount')::NUMERIC, 0),
+        sale_payload->>'discount_type',
         COALESCE((sale_payload->>'created_at')::TIMESTAMPTZ, NOW())
     ) RETURNING id INTO new_sale_id;
 
@@ -377,4 +412,16 @@ CREATE TABLE IF NOT EXISTS public.shop_talk (
 );
 
 -- Enable realtime for shop_talk
-ALTER PUBLICATION supabase_realtime ADD TABLE shop_talk;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'shop_talk'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE shop_talk;
+    END IF;
+END
+$$;

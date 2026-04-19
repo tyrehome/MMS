@@ -19,17 +19,22 @@ import {
   SwapHoriz as SwapIcon,
   Print as PrintIcon,
   Close as CloseIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Translate as TranslateIcon,
+  Description as QuoteIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 
-const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
+const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
+  const { t, receiptLang, toggleReceiptLang } = useLanguage();
   console.log('SaleForm Accounts:', accounts);
   const { isAdmin } = useAuth();
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
     payment_method: 'Cash', account_id: '', items: [],
-    trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1
+    trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1,
+    discount_active: false, discount_type: 'Fixed', discount_value: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newItem, setNewItem] = useState({ type: 'tire', tire_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
@@ -90,18 +95,33 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
     setNewItem({ type: 'tire', tire_id: '', part_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
   };
 
+  const calculateDiscount = () => {
+    if (!invoice.discount_active || !invoice.discount_value) return 0;
+    if (invoice.discount_type === 'Percentage') {
+      return (calculateSubtotal() * Number(invoice.discount_value)) / 100;
+    }
+    return Number(invoice.discount_value);
+  };
+
   const calculateSubtotal = () => invoice.items.reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
   const calculateTradeInDeduction = () => invoice.trade_in_active ? Number(invoice.trade_in_value) * Number(invoice.trade_in_quantity || 1) : 0;
-  const calculateTotal = () => calculateSubtotal() - calculateTradeInDeduction();
+  const calculateTotal = () => Math.max(0, calculateSubtotal() - calculateTradeInDeduction() - calculateDiscount());
 
   const handleSubmit = async (e, shouldPrint = false) => {
     if (e) e.preventDefault();
     if (invoice.items.length === 0) return alert("Empty basket.");
     if (invoice.payment_method === 'Customer Credit' && !invoice.account_id) return alert("Account required for credit payment.");
     if (invoice.trade_in_active && invoice.trade_in_value <= 0) return alert("Enter a valid trade-in value.");
+    if (invoice.discount_active && invoice.discount_value < 0) return alert("Enter a valid discount value.");
 
     setIsSubmitting(true);
-    const saleData = { ...invoice, subtotal: calculateSubtotal(), total: calculateTotal(), currency };
+    const saleData = { 
+      ...invoice, 
+      subtotal: calculateSubtotal(), 
+      total: calculateTotal(),
+      discount_amount: calculateDiscount(),
+      currency 
+    };
     const success = await addSale(saleData);
     if (success) {
       if (shouldPrint) {
@@ -111,10 +131,80 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
       setInvoice({
         customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
         payment_method: 'Cash', account_id: '', items: [],
-        trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1
+        trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1,
+        discount_active: false, discount_type: 'Fixed', discount_value: ''
       });
       if (!shouldPrint) alert("Transaction success.");
     } else { alert("Operational failure. Check stock/credit."); }
+    setIsSubmitting(false);
+  };
+
+  useEffect(() => {
+    let barcodeData = '';
+    let timeoutId = null;
+
+    const handleKeyDown = (e) => {
+      // Ignore if user is manually typing inside a text box
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (e.key === 'Enter') {
+        if (barcodeData.length > 2) {
+          const code = barcodeData.trim().toLowerCase();
+          // Find matching tire or part
+          const tireMatch = tires.find(t => t.brand.toLowerCase().includes(code) || t.size.toLowerCase().includes(code) || (t.dot_code || '').toLowerCase() === code);
+          const partMatch = parts.find(p => p.name.toLowerCase().includes(code) || (p.sku || '').toLowerCase() === code);
+          
+          if (tireMatch) {
+            const newItem = { id: Date.now().toString(), type: 'tire', tire_id: tireMatch.id, quantity: 1, price: tireMatch.selling_price || 0, subtotal: tireMatch.selling_price || 0 };
+            setInvoice(prev => ({ ...prev, items: [...prev.items, newItem] }));
+          } else if (partMatch) {
+            const newItem = { id: Date.now().toString(), type: 'part', part_id: partMatch.id, quantity: 1, price: partMatch.selling_price || partMatch.price || 0, subtotal: partMatch.selling_price || partMatch.price || 0 };
+            setInvoice(prev => ({ ...prev, items: [...prev.items, newItem] }));
+          }
+        }
+        barcodeData = '';
+      } else if (e.key.length === 1) {
+        barcodeData += e.key;
+        timeoutId = setTimeout(() => { barcodeData = ''; }, 50);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tires, parts]);
+
+  const handleGenerateQuote = async (e) => {
+    if (e) e.preventDefault();
+    if (invoice.items.length === 0) return alert("Empty basket.");
+
+    setIsSubmitting(true);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const quoteData = { 
+      customer_name: invoice.customer_name || 'Walk-in',
+      vehicle_number: invoice.vehicle_number,
+      total: calculateTotal(),
+      items: invoice.items,
+      status: 'draft',
+      expires_at: expiresAt.toISOString()
+    };
+
+    const success = await saveQuotation(quoteData);
+    if (success) {
+      setLastSavedInvoice({ 
+        ...invoice, 
+        subtotal: calculateSubtotal(), 
+        total: calculateTotal(), 
+        discount_amount: calculateDiscount(), 
+        currency, 
+        is_quote: true, 
+        expires_at: expiresAt.toLocaleDateString() 
+      });
+      setIsPrintDialogOpen(true);
+    } else { alert("Failed to save quotation."); }
     setIsSubmitting(false);
   };
 
@@ -167,8 +257,8 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
     <Box sx={{ p: 1 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>POS & Billing Engine</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>High-frequency transaction terminal with intelligent stock routing</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>{t('posTitle')}</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>{t('posSubTitle')}</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           {saveStatus && <Alert severity="info" sx={{ py: 0, px: 2, borderRadius: 2 }}>{saveStatus}</Alert>}
@@ -183,36 +273,36 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
         <Grid item xs={12}>
           <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
             <CardContent sx={{ p: 4 }}>
-              <Grid container spacing={4}>
-                <Grid item xs={12} md={3}>
+              <Grid container spacing={{xs: 2, md: 4}}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                     <PersonIcon color="primary" sx={{ fontSize: 20 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>Customer Name</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>{t('customerName')}</Typography>
                   </Box>
-                  <TextField fullWidth placeholder="Customer Name" value={invoice.customer_name} onChange={e => setInvoice({ ...invoice, customer_name: e.target.value })} variant="standard" InputProps={{ sx: { fontWeight: 800, fontSize: '1.2rem' } }} />
+                  <TextField fullWidth placeholder={t('customerName')} value={invoice.customer_name} onChange={e => setInvoice({ ...invoice, customer_name: e.target.value })} variant="standard" InputProps={{ sx: { fontWeight: 800, fontSize: {xs: '1rem', md: '1.2rem'} } }} />
                 </Grid>
-                <Grid item xs={12} md={3}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                     <CarIcon color="primary" sx={{ fontSize: 20 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>Vehicle Number</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>{t('vehicleNumber')}</Typography>
                   </Box>
-                  <TextField fullWidth placeholder="LP Number" value={invoice.vehicle_number} onChange={e => setInvoice({ ...invoice, vehicle_number: e.target.value })} variant="standard" InputProps={{ sx: { fontWeight: 800, fontSize: '1.2rem' } }} />
+                  <TextField fullWidth placeholder="LP Number" value={invoice.vehicle_number} onChange={e => setInvoice({ ...invoice, vehicle_number: e.target.value })} variant="standard" InputProps={{ sx: { fontWeight: 800, fontSize: {xs: '1rem', md: '1.2rem'} } }} />
                 </Grid>
-                <Grid item xs={12} md={3}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                     <PaymentIcon color="primary" sx={{ fontSize: 20 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>Payment Method</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', textTransform: 'uppercase' }}>{t('paymentMethod')}</Typography>
                   </Box>
                   <FormControl fullWidth variant="standard">
                     <Select value={invoice.payment_method} onChange={e => setInvoice({ ...invoice, payment_method: e.target.value, account_id: '' })} sx={{ fontWeight: 800 }}>
                       <MenuItem value="Cash">Cash</MenuItem>
                       <MenuItem value="Credit Card">Credit Card</MenuItem>
-                      <MenuItem value="Customer Credit">Customer Credit (Account)</MenuItem>
+                      <MenuItem value="Customer Credit">Customer Credit</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 {invoice.payment_method === 'Customer Credit' && (
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                       <AnalyticsIcon color="secondary" sx={{ fontSize: 20 }} />
                       <Typography variant="caption" sx={{ fontWeight: 900, color: 'secondary.main', textTransform: 'uppercase' }}>Account Intelligence</Typography>
@@ -245,16 +335,17 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
         {/* Selection Area */}
         <Grid item xs={12} md={7}>
           <Card sx={{ borderRadius: 4, minHeight: 600, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ p: 3, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Button variant={selectedCategory === 'tires' ? "contained" : "text"} onClick={() => setSelectedCategory('tires')} sx={{ fontWeight: 800, borderRadius: 2 }}>Tires</Button>
-              <Button variant={selectedCategory === 'parts' ? "contained" : "text"} onClick={() => setSelectedCategory('parts')} sx={{ fontWeight: 800, borderRadius: 2 }}>Parts</Button>
-              <Button variant={selectedCategory === 'services' ? "contained" : "text"} onClick={() => setSelectedCategory('services')} sx={{ fontWeight: 800, borderRadius: 2 }}>Services</Button>
-              <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: 'auto', '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
+            <Box sx={{ p: {xs: 1.5, md: 3}, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: {xs: 1, sm: 2}, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button size="small" variant={selectedCategory === 'all' ? "contained" : "text"} onClick={() => setSelectedCategory('all')} sx={{ fontWeight: 800, borderRadius: 2, background: selectedCategory === 'all' ? 'linear-gradient(135deg,#1a237e,#311b92)' : undefined }}>All</Button>
+              <Button size="small" variant={selectedCategory === 'tires' ? "contained" : "text"} onClick={() => setSelectedCategory('tires')} sx={{ fontWeight: 800, borderRadius: 2 }}>Tires</Button>
+              <Button size="small" variant={selectedCategory === 'parts' ? "contained" : "text"} onClick={() => setSelectedCategory('parts')} sx={{ fontWeight: 800, borderRadius: 2 }}>Parts</Button>
+              <Button size="small" variant={selectedCategory === 'services' ? "contained" : "text"} onClick={() => setSelectedCategory('services')} sx={{ fontWeight: 800, borderRadius: 2 }}>Services</Button>
+              <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: {sm: 'auto'}, width: {xs: '100%', sm: 'auto'}, '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
             </Box>
             {/* Item Config Bar */}
             <Box sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.01)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={5}>
+              <Grid container spacing={2} alignItems="flex-end">
+                <Grid item xs={12} sm={5}>
                   <Typography variant="caption" sx={{ fontWeight: 800, mb: 1, display: 'block' }}>SPEC & ASSIGNMENT</Typography>
                   {newItem.type === 'tire' ? (
                     <TextField fullWidth size="small" placeholder="Serial Code" value={newItem.serial_number} onChange={e => setNewItem({ ...newItem, serial_number: e.target.value })} InputProps={{ sx: { borderRadius: 2 } }} />
@@ -265,11 +356,11 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                     </Select>
                   )}
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={6} sm={2}>
                   <Typography variant="caption" sx={{ fontWeight: 800, mb: 1, display: 'block' }}>QUANTITY</Typography>
                   <TextField fullWidth size="small" type="number" value={newItem.quantity} onChange={e => setNewItem({ ...newItem, quantity: e.target.value })} InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 1 } }} />
                 </Grid>
-                <Grid item xs={3}>
+                <Grid item xs={6} sm={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                     <Typography variant="caption" sx={{ fontWeight: 800 }}>RATE OVERRIDE</Typography>
                     {!isAdmin && <LockIcon sx={{ fontSize: 12, color: 'error.main' }} />}
@@ -286,14 +377,107 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                     </span>
                   </Tooltip>
                 </Grid>
-                <Grid item xs={2}>
-                  <IconButton color="primary" onClick={handleAddItem} sx={{ bgcolor: 'primary.light', p: 1.5, borderRadius: 2 }}><AddIcon /></IconButton>
+                <Grid item xs={12} sm={2}>
+                  <IconButton color="primary" fullWidth onClick={handleAddItem} sx={{ bgcolor: 'primary.light', p: {xs: 1, sm: 1.5}, borderRadius: 2, width: {xs: '100%', sm: 'auto'} }}><AddIcon /></IconButton>
                 </Grid>
               </Grid>
             </Box>
 
             <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', maxHeight: 600 }}>
               <Grid container spacing={2}>
+
+                {/* ───────── ALL TAB ───────── */}
+                {selectedCategory === 'all' && [
+                  ...tires
+                    .filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                 t.size?.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map(t => ({ type: 'tire', id: t.id, name: t.brand, subtitle: t.size, price: t.price, stock: t.stock, image: t.images?.[0] || null, data: t })),
+                  ...parts
+                    .filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                 p.category?.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map(p => ({ type: 'part', id: p.id, name: p.name, subtitle: p.category, price: p.price, stock: p.stock, image: null, data: p })),
+                  ...services
+                    .filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map(s => ({ type: 'service', id: s, name: s, subtitle: 'Service', price: 0, stock: null, image: null, data: s })),
+                ].map(item => {
+                  const isSelected =
+                    (item.type === 'tire'    && newItem.tire_id      === item.id) ||
+                    (item.type === 'part'    && newItem.part_id      === item.id) ||
+                    (item.type === 'service' && newItem.service_name === item.name);
+
+                  const typeColor =
+                    item.type === 'tire'    ? { bg: 'rgba(26,35,126,0.10)', fg: '#1a237e' } :
+                    item.type === 'part'    ? { bg: 'rgba(245,0,87,0.10)', fg: '#f50057' } :
+                                             { bg: 'rgba(76,175,80,0.10)', fg: '#2e7d32' };
+
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={`${item.type}-${item.id}`}>
+                      <Card
+                        onClick={() => {
+                          if (item.type === 'tire')    setNewItem({ ...newItem, type: 'tire',    tire_id: item.id,   price: item.price });
+                          else if (item.type === 'part') setNewItem({ ...newItem, type: 'part',  part_id: item.id,   price: item.price });
+                          else                          setNewItem({ ...newItem, type: 'service', service_name: item.name });
+                        }}
+                        sx={{
+                          cursor: 'pointer', borderRadius: 4,
+                          border: isSelected ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                          borderColor: isSelected ? 'primary.main' : undefined,
+                          boxShadow: isSelected ? '0 10px 20px rgba(0,0,0,0.06)' : 'none',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <CardContent sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
+                            <Chip
+                              label={item.type.toUpperCase()}
+                              size="small"
+                              sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: typeColor.bg, color: typeColor.fg }}
+                            />
+                            {item.stock !== null && (
+                              <Chip
+                                label={`Stk: ${item.stock}`}
+                                size="small"
+                                color={item.stock <= 2 ? 'error' : item.stock <= 5 ? 'warning' : 'default'}
+                                sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }}
+                              />
+                            )}
+                          </Box>
+                          {item.image && (
+                            <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 1 }}>
+                              <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </Box>
+                          )}
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{item.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{item.subtitle}</Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5, alignItems: 'center' }}>
+                            <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: '0.85rem' }}>
+                              {item.price > 0 ? `${item.price} ${currency}` : 'Set price'}
+                            </Typography>
+                          </Box>
+                          <Button
+                            fullWidth size="small" variant="contained"
+                            startIcon={<AddIcon />}
+                            sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (item.type === 'tire') {
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire',    tire_id: item.id, price: item.price, quantity: 1, id: Date.now() }] });
+                              } else if (item.type === 'part') {
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'part',    part_id: item.id, price: item.price, quantity: 1, id: Date.now() }] });
+                              } else {
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: item.name, price: 0, quantity: 1, id: Date.now() }] });
+                              }
+                            }}
+                          >
+                            QUICK ADD
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+
+                {/* ───────── TIRES TAB ───────── */}
                 {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
                   <Grid item xs={12} sm={6} md={4} key={t.id}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'tire', tire_id: t.id, price: t.price })} sx={{
@@ -314,9 +498,9 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                           <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{t.price} {currency}</Typography>
                           <Chip label={`Stock: ${t.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
                         </Box>
-                        <Button 
-                          fullWidth size="small" variant="contained" 
-                          startIcon={<AddIcon />} 
+                        <Button
+                          fullWidth size="small" variant="contained"
+                          startIcon={<AddIcon />}
                           sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -329,7 +513,8 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                     </Card>
                   </Grid>
                 ))}
-                
+
+                {/* ───────── PARTS TAB ───────── */}
                 {selectedCategory === 'parts' && parts.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
                   <Grid item xs={12} sm={6} md={4} key={p.id}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'part', part_id: p.id, price: p.price })} sx={{
@@ -339,15 +524,21 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                       boxShadow: newItem.part_id === p.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
                     }}>
                       <CardContent sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{p.name}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{p.category}</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Chip
+                            label={p.category || 'Part'}
+                            size="small"
+                            sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: 'rgba(245,0,87,0.08)', color: 'secondary.main' }}
+                          />
+                          <Chip label={`Stk: ${p.stock}`} size="small" color={p.stock <= 2 ? 'error' : p.stock <= 5 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }} />
+                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.5 }}>{p.name}</Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
                           <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.price} {currency}</Typography>
-                          <Chip label={`Stock: ${p.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
                         </Box>
-                        <Button 
-                          fullWidth size="small" variant="contained" 
-                          startIcon={<AddIcon />} 
+                        <Button
+                          fullWidth size="small" variant="contained"
+                          startIcon={<AddIcon />}
                           sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -361,6 +552,7 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                   </Grid>
                 ))}
 
+                {/* ───────── SERVICES TAB ───────── */}
                 {selectedCategory === 'services' && services.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
                   <Grid item xs={12} sm={6} md={4} key={s}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'service', service_name: s })} sx={{
@@ -369,9 +561,9 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                       borderColor: newItem.service_name === s ? 'primary.main' : undefined,
                     }}>
                       <Typography sx={{ fontWeight: 900 }}>{s}</Typography>
-                      <Button 
-                        size="small" variant="contained" 
-                        startIcon={<AddIcon />} 
+                      <Button
+                        size="small" variant="contained"
+                        startIcon={<AddIcon />}
                         sx={{ position: 'absolute', bottom: 4, right: 4, borderRadius: 2, fontSize: '0.6rem' }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -390,9 +582,9 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
 
         {/* Draft Invoice */}
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 4, borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', height: '80vh', display: 'flex', flexDirection: 'column' }}>
+          <Paper sx={{ p: {xs: 2, md: 4}, borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '85vh' }}>
             <Box sx={{ p: 3, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Draft Invoice</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>{t('draftInvoice')}</Typography>
               <ShoppingCartIcon />
             </Box>
             <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'auto' }}>
@@ -437,44 +629,71 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                   )}
                 </TableBody>
               </Table>
+
+              {/* Trade-in fields moved inside scroll area */}
+              {invoice.trade_in_active && (
+                <Box sx={{ px: 3, py: 2, mt: 'auto', borderTop: '1px solid rgba(0,0,0,0.05)', bgcolor: 'rgba(76,175,80,0.05)' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 900, color: 'success.main', textTransform: 'uppercase', display: 'block', mb: 1.5 }}>
+                    <SwapIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />Trade-In Details
+                  </Typography>
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth size="small" label="Description (brand/size/condition)"
+                        value={invoice.trade_in_description}
+                        onChange={e => setInvoice({ ...invoice, trade_in_description: e.target.value })}
+                        InputProps={{ sx: { borderRadius: 2 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth size="small" type="number" label="Trade-In Value"
+                        value={invoice.trade_in_value}
+                        onChange={e => setInvoice({ ...invoice, trade_in_value: parseFloat(e.target.value) || 0 })}
+                        InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 0 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth size="small" type="number" label="Quantity"
+                        value={invoice.trade_in_quantity}
+                        onChange={e => setInvoice({ ...invoice, trade_in_quantity: parseInt(e.target.value) || 1 })}
+                        InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 1 } }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Discount fields moved inside scroll area */}
+              {invoice.discount_active && (
+                <Box sx={{ px: 3, py: 2, mt: invoice.trade_in_active ? 0 : 'auto', borderTop: invoice.trade_in_active ? 'none' : '1px solid rgba(0,0,0,0.05)', bgcolor: 'rgba(255,152,0,0.05)' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 900, color: 'warning.main', textTransform: 'uppercase', display: 'block', mb: 1.5 }}>
+                    Special Discount
+                  </Typography>
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={6}>
+                      <FormControl fullWidth size="small">
+                        <Select value={invoice.discount_type} onChange={e => setInvoice({ ...invoice, discount_type: e.target.value })} sx={{ borderRadius: 2 }}>
+                          <MenuItem value="Fixed">Fixed Amount</MenuItem>
+                          <MenuItem value="Percentage">Percentage (%)</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth size="small" type="number" label="Discount Value"
+                        value={invoice.discount_value}
+                        onChange={e => setInvoice({ ...invoice, discount_value: e.target.value })}
+                        InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 0 } }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
             </Box>
 
-            {/* Trade-in fields */}
-            {invoice.trade_in_active && (
-              <Box sx={{ px: 3, pb: 2 }}>
-                <Typography variant="caption" sx={{ fontWeight: 900, color: 'success.main', textTransform: 'uppercase', display: 'block', mb: 1.5 }}>
-                  <SwapIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />Trade-In Details
-                </Typography>
-                <Grid container spacing={1.5}>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth size="small" label="Description (brand/size/condition)"
-                      value={invoice.trade_in_description}
-                      onChange={e => setInvoice({ ...invoice, trade_in_description: e.target.value })}
-                      InputProps={{ sx: { borderRadius: 2 } }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth size="small" type="number" label="Trade-In Value (per unit)"
-                      value={invoice.trade_in_value}
-                      onChange={e => setInvoice({ ...invoice, trade_in_value: parseFloat(e.target.value) || 0 })}
-                      InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 0 } }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth size="small" type="number" label="Quantity"
-                      value={invoice.trade_in_quantity}
-                      onChange={e => setInvoice({ ...invoice, trade_in_quantity: parseInt(e.target.value) || 1 })}
-                      InputProps={{ sx: { borderRadius: 2 }, inputProps: { min: 1 } }}
-                    />
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-
-            <Box sx={{ p: 4, bgcolor: 'primary.main', color: '#fff' }}>
+            <Box sx={{ p: {xs: 2, md: 3}, bgcolor: 'primary.main', color: '#fff' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography sx={{ fontWeight: 500, opacity: 0.8 }}>Subtotal</Typography>
                 <Typography sx={{ fontWeight: 900 }}>{calculateSubtotal().toLocaleString()} {currency}</Typography>
@@ -483,6 +702,12 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography sx={{ fontWeight: 500, opacity: 0.8 }}>Trade-In Deduction</Typography>
                   <Typography sx={{ fontWeight: 900, color: '#a5d6a7' }}>-{calculateTradeInDeduction().toLocaleString()} {currency}</Typography>
+                </Box>
+              )}
+              {invoice.discount_active && calculateDiscount() > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography sx={{ fontWeight: 500, opacity: 0.8 }}>Discount {invoice.discount_type === 'Percentage' ? `(${invoice.discount_value}%)` : ''}</Typography>
+                  <Typography sx={{ fontWeight: 900, color: '#ffb74d' }}>-{calculateDiscount().toLocaleString()} {currency}</Typography>
                 </Box>
               )}
               <Divider sx={{ mb: 2, bgcolor: 'rgba(255,255,255,0.1)' }} />
@@ -501,18 +726,36 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                     sx={{ py: 2, borderRadius: 3, fontWeight: 900, boxShadow: '0 8px 16px rgba(245, 0, 87, 0.3)' }}
                     startIcon={<ReceiptIcon />}
                   >
-                    {isSubmitting ? 'Processing...' : 'PAY & PRINT'}
+                    {isSubmitting ? 'Processing...' : t('payAndPrint')}
                   </Button>
                 </Grid>
                 <Grid item xs={6}>
-                  <Button variant="outlined" color="inherit" fullWidth onClick={handleSaveDraft} sx={{ py: 1.5, borderRadius: 3, fontWeight: 800, border: '1.5px solid rgba(255,255,255,0.4)' }}>
-                    SAVE DRAFT
+                  <Button variant="outlined" color="inherit" fullWidth onClick={handleSaveDraft} sx={{ py: 1.5, borderRadius: 3, fontWeight: 800, border: '1.5px solid rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+                    {t('draftInvoice')}
+                  </Button>
+                </Grid>
+                <Grid item xs={6}>
+                  <Button 
+                    variant="contained" 
+                    fullWidth 
+                    onClick={handleGenerateQuote} 
+                    disabled={isSubmitting} 
+                    sx={{ py: 1.5, borderRadius: 3, fontWeight: 900, bgcolor: 'rgba(255,255,255,0.95)', color: 'primary.main', '&:hover': { bgcolor: '#fff' }, fontSize: '0.8rem' }} 
+                    startIcon={<QuoteIcon />}
+                  >
+                    {t('generateQuote')}
                   </Button>
                 </Grid>
                 <Grid item xs={6}>
                   <FormControlLabel
                     control={<Checkbox checked={invoice.trade_in_active} onChange={e => setInvoice({ ...invoice, trade_in_active: e.target.checked, trade_in_value: 0, trade_in_description: '', trade_in_quantity: 1 })} sx={{ color: '#fff' }} />}
                     label={<Typography variant="caption" sx={{ fontWeight: 800 }}>Trade-In</Typography>}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={<Checkbox checked={invoice.discount_active} onChange={e => setInvoice({ ...invoice, discount_active: e.target.checked, discount_value: '', discount_type: 'Fixed' })} sx={{ color: '#fff' }} />}
+                    label={<Typography variant="caption" sx={{ fontWeight: 800 }}>Discount</Typography>}
                   />
                 </Grid>
               </Grid>
@@ -525,8 +768,11 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
       {/* Receipt Preview Dialog */}
       <Dialog open={isPrintDialogOpen} onClose={() => setIsPrintDialogOpen(false)} maxWidth="xs" fullWidth scroll="paper" PaperProps={{ sx: { borderRadius: 4 } }}>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
-          <Typography sx={{ fontWeight: 900 }}>Receipt Preview</Typography>
-          <IconButton onClick={() => setIsPrintDialogOpen(false)} size="small"><CloseIcon /></IconButton>
+          <Typography sx={{ fontWeight: 900 }}>{t('receiptPreview')}</Typography>
+          <Box>
+            <Button size="small" onClick={toggleReceiptLang} startIcon={<TranslateIcon />} sx={{ mr: 1 }}>{receiptLang === 'en' ? 'EN' : 'සිංහල'}</Button>
+            <IconButton onClick={() => setIsPrintDialogOpen(false)} size="small"><CloseIcon /></IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent sx={{ bgcolor: '#f5f5f5', p: 4 }}>
           <Box id="thermal-receipt-preview" sx={{
@@ -557,20 +803,26 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                 {businessProfile?.logo_url && <img src={businessProfile.logo_url} className="logo" alt="Logo" />}
                 <span className="business-name">{businessProfile?.name}</span>
                 <div style={{ fontSize: '10px' }}>{businessProfile?.address}</div>
+                {lastSavedInvoice?.is_quote && (
+                  <div style={{ marginTop: '8px', padding: '4px', borderTop: '2px solid #000', borderBottom: '2px solid #000', fontWeight: 900, fontSize: '14px', letterSpacing: '1px' }}>
+                    {t('quotation', 'receipt')}
+                  </div>
+                )}
               </div>
 
               <div className="info">
-                <div className="total-row"><span>DATE:</span> <span>{lastSavedInvoice?.date}</span></div>
-                <div className="total-row"><span>CUSTOMER:</span> <span>{lastSavedInvoice?.customer_name || 'Walk-in'}</span></div>
-                {lastSavedInvoice?.vehicle_number && <div className="total-row"><span>VEHICLE:</span> <span>{lastSavedInvoice?.vehicle_number}</span></div>}
+                <div className="total-row"><span>{t('date', 'receipt')}</span> <span>{lastSavedInvoice?.date}</span></div>
+                {lastSavedInvoice?.is_quote && <div className="total-row"><span>{t('validUntil', 'receipt')}</span> <span>{lastSavedInvoice?.expires_at}</span></div>}
+                <div className="total-row"><span>{t('customer', 'receipt')}</span> <span>{lastSavedInvoice?.customer_name || t('walkIn', 'receipt')}</span></div>
+                {lastSavedInvoice?.vehicle_number && <div className="total-row"><span>{t('vehicle', 'receipt')}</span> <span>{lastSavedInvoice?.vehicle_number}</span></div>}
               </div>
 
               <table className="table">
                 <thead>
                   <tr>
-                    <th>ITEM</th>
-                    <th align="right">QTY</th>
-                    <th align="right">SUB</th>
+                    <th>{t('item', 'receipt')}</th>
+                    <th align="right">{t('qty', 'receipt')}</th>
+                    <th align="right">{t('sub', 'receipt')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -586,23 +838,29 @@ const SaleForm = ({ tires, parts = [], addSale, masterData, businessProfile, acc
                   ))}
                   {lastSavedInvoice?.trade_in_active && (
                     <tr style={{ fontStyle: 'italic' }}>
-                      <td>Trade-In: {lastSavedInvoice.trade_in_description}</td>
+                      <td>{t('tradeIn', 'receipt')} {lastSavedInvoice.trade_in_description}</td>
                       <td align="right">{lastSavedInvoice.trade_in_quantity}</td>
-                      <td align="right">-{((lastSavedInvoice.trade_in_value || 0) * (lastSavedInvoice.trade_in_quantity || 1)).toLocaleString()}</td>
+                      <td align="right">-{(Number(lastSavedInvoice.trade_in_value || 0) * Number(lastSavedInvoice.trade_in_quantity || 1)).toLocaleString()}</td>
+                    </tr>
+                  )}
+                  {lastSavedInvoice?.discount_amount > 0 && (
+                    <tr style={{ fontStyle: 'italic' }}>
+                      <td colSpan="2">{t('discount', 'receipt')} {lastSavedInvoice.discount_type === 'Percentage' ? `(${lastSavedInvoice.discount_value}%)` : ''}</td>
+                      <td align="right">-{(lastSavedInvoice.discount_amount || 0).toLocaleString()}</td>
                     </tr>
                   )}
                 </tbody>
               </table>
 
               <div className="totals">
-                <div className="total-row"><span>Subtotal</span> <span>{lastSavedInvoice?.subtotal?.toLocaleString()}</span></div>
-                <div className="total-row grand-total"><span>TOTAL ({currency})</span> <span>{lastSavedInvoice?.total?.toLocaleString()}</span></div>
+                <div className="total-row"><span>{t('subtotal', 'receipt')}</span> <span>{lastSavedInvoice?.subtotal?.toLocaleString()}</span></div>
+                <div className="total-row grand-total"><span>{t('totalStr', 'receipt')} ({currency})</span> <span>{lastSavedInvoice?.total?.toLocaleString()}</span></div>
               </div>
 
               <div className="footer">
-                <div>THANK YOU FOR YOUR BUSINESS!</div>
-                <div>Warranty Claims valid with this receipt.</div>
-                <div className="dev-credit">Powered by amsome.com</div>
+                {!lastSavedInvoice?.is_quote && <div>{t('thankYou', 'receipt')}</div>}
+                {!lastSavedInvoice?.is_quote && <div>{t('warranty', 'receipt')}</div>}
+                <div className="dev-credit">{t('poweredBy', 'receipt')}</div>
               </div>
             </div>
           </Box>

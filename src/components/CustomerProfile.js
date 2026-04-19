@@ -9,7 +9,7 @@ import {
   Person, DirectionsCar, Hotel, 
   LocalPhone, Email, 
   Receipt, Warning, CalendarMonth, SettingsAccessibility,
-  Add as AddIcon
+  Add as AddIcon, PhoneInTalk as PhoneIcon
 } from '@mui/icons-material';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -67,6 +67,18 @@ const CustomerProfile = ({
   const customerSales = sales.filter(s => s.customer_name === selectedCustomer?.name);
   const totalSpent = customerSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
 
+  // Retention Logic: identify customers who haven't visited in > 6 months
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const retentionList = customers.map(c => {
+    const custSales = sales.filter(s => s.customer_name === c.name);
+    if (custSales.length === 0) return null;
+    const lastSale = custSales.sort((a,b) => new Date(b.created_at || new Date().toISOString()) - new Date(a.created_at || new Date().toISOString()))[0];
+    const lastVisit = new Date(lastSale.created_at || new Date().toISOString());
+    return { ...c, lastVisit, isDue: lastVisit < sixMonthsAgo };
+  }).filter(c => c && c.isDue).sort((a,b) => a.lastVisit - b.lastVisit);
+
   return (
     <Box sx={{ p: 1 }}>
       <Box sx={{ mb: 4 }}>
@@ -86,6 +98,7 @@ const CustomerProfile = ({
         <Tab icon={<SettingsAccessibility />} iconPosition="start" label="Customer Intelligence" />
         <Tab icon={<CalendarMonth />} iconPosition="start" label="Appointments & Tasks" />
         <Tab icon={<DirectionsCar />} iconPosition="start" label="Fleet Tracking" />
+        <Tab icon={<PhoneIcon />} iconPosition="start" label={`Retention & Call List (${retentionList.length})`} />
       </Tabs>
 
       {tabLevel1 === 0 && (
@@ -320,6 +333,39 @@ const CustomerProfile = ({
 
       {tabLevel1 === 1 && <AppointmentSystem appointmentsList={appointments} vehiclesList={vehicles} />}
       {tabLevel1 === 2 && <VehicleTracking vehiclesList={vehicles} businessProfile={businessProfile} />}
+      
+      {tabLevel1 === 3 && (
+        <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', p: 4 }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, mb: 1, color: 'primary.main' }}>Retention Call List</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+            These customers haven't purchased anything in the last 6 months. It's time to call them for periodic services (Alignments, Rotations, Oil Changes).
+          </Typography>
+          
+          {retentionList.length === 0 ? (
+            <Alert severity="success" sx={{ borderRadius: 3 }}>All clients are fully up-to-date with their service protocols!</Alert>
+          ) : (
+            <List>
+              {retentionList.map(c => (
+                <Paper key={c.id} variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ bgcolor: 'error.light', color: 'error.main' }}><Warning /></Avatar>
+                    <Box>
+                      <Typography sx={{ fontWeight: 900 }}>{c.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">Last seen: {format(c.lastVisit, 'PPP')} (Over 6 months ago)</Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography sx={{ fontWeight: 800, color: 'text.secondary' }}>{c.phone || 'No Phone'}</Typography>
+                    <Button variant="contained" color="primary" startIcon={<PhoneIcon />} onClick={() => setSelectedCustomerId(c.id) || setTabLevel1(0)} sx={{ borderRadius: 2 }}>
+                      VIEW LOG
+                    </Button>
+                  </Box>
+                </Paper>
+              ))}
+            </List>
+          )}
+        </Card>
+      )}
 
       <Dialog open={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
         <DialogTitle sx={{ fontWeight: 900 }}>Client Intelligence Registration</DialogTitle>

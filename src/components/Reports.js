@@ -3,7 +3,8 @@ import {
     Typography, Box, Tab, Tabs, Grid, Card, CardContent, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
     Chip, TextField, InputAdornment, Button, IconButton,
-    Collapse, Avatar, MenuItem, Select, FormControl, InputLabel, Tooltip
+    Collapse, Avatar, MenuItem, Select, FormControl, InputLabel, Tooltip,
+    Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -24,10 +25,11 @@ import {
     Security as AuditIcon,
     CalendarToday as CalendarIcon,
     Receipt as ReceiptIcon,
-    Refresh as RefreshIcon
+    Refresh as RefreshIcon,
+    LocalShipping as SupplierIcon
 } from '@mui/icons-material';
 
-const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], businessProfile }) => {
+const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], suppliers = [], businessProfile }) => {
     const { isAdmin } = useAuth();
     const [hubTab, setHubTab] = useState(0);
     const [reportTab, setReportTab] = useState(0);
@@ -37,6 +39,16 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], busines
     const [expandedSale, setExpandedSale] = useState(null);
     const [auditLogs, setAuditLogs] = useState([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
+
+    // Supplier Payables
+    const [openSupplierDialog, setOpenSupplierDialog] = useState(false);
+    const [openPayVendorDialog, setOpenPayVendorDialog] = useState(false);
+    const [supplierDetails, setSupplierDetails] = useState({ name: '', phone: '', email: '', payable_balance: 0 });
+    const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+    const [paymentAmount, setPaymentAmount] = useState(0);
+    const [openVendorStatement, setOpenVendorStatement] = useState(false);
+    const [selectedSupplierForStatement, setSelectedSupplierForStatement] = useState(null);
+
     const currency = businessProfile?.currency || 'LKR';
 
     // Fetch audit logs when on audit tab
@@ -164,7 +176,8 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], busines
             >
                 <Tab icon={<AnalyticsIcon />} iconPosition="start" label="Performance" />
                 <Tab icon={<HistoryIcon />} iconPosition="start" label="Sales History" />
-                <Tab icon={<BankIcon />} iconPosition="start" label="Ledger Accounts" />
+                <Tab icon={<BankIcon />} iconPosition="start" label="Customer Receivables" />
+                <Tab icon={<SupplierIcon />} iconPosition="start" label="Vendor Payables" />
                 <Tab icon={<AuditIcon />} iconPosition="start" label="Audit Log" />
             </Tabs>
 
@@ -455,7 +468,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], busines
                 </Box>
             )}
 
-            {/* TAB 2: Ledger Accounts */}
+            {/* TAB 2: Customer Receivables */}
             {hubTab === 2 && (
                 <CurrentAccount
                     businessProfile={businessProfile}
@@ -464,8 +477,174 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], busines
                 />
             )}
 
-            {/* TAB 3: Audit Log */}
+            {/* TAB 3: Vendor Payables */}
             {hubTab === 3 && (
+                <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 900 }}>Vendor Payables Ledger</Typography>
+                        <Button variant="contained" onClick={() => { setSupplierDetails({ name: '', phone: '', email: '', payable_balance: 0 }); setOpenSupplierDialog(true); }} sx={{ borderRadius: 3, fontWeight: 900 }}>
+                            ADD NEW VENDOR
+                        </Button>
+                    </Box>
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                        <Grid item xs={12} md={4}>
+                            <Card sx={{ borderRadius: 4, background: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                <CardContent>
+                                    <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.8 }}>Total Outstanding Payables</Typography>
+                                    <Typography variant="h4" sx={{ fontWeight: 900, color: 'error.main' }}>
+                                        {suppliers.reduce((s, a) => s + Number(a.payable_balance || 0), 0).toLocaleString()} {currency}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    </Grid>
+                    <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                        <TableContainer>
+                            <Table>
+                                <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 900, py: 2.5 }}>VENDOR NAME</TableCell>
+                                        <TableCell sx={{ fontWeight: 900 }}>CONTACT</TableCell>
+                                        <TableCell sx={{ fontWeight: 900 }}>PAYABLE BALANCE</TableCell>
+                                        <TableCell align="center" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {suppliers.length === 0 && (
+                                        <TableRow><TableCell colSpan={4} align="center" sx={{ py: 6 }}>No vendors registered.</TableCell></TableRow>
+                                    )}
+                                    {suppliers.map(sup => (
+                                        <TableRow key={sup.id} hover>
+                                            <TableCell sx={{ fontWeight: 900 }}>{sup.name}</TableCell>
+                                            <TableCell>{sup.phone || sup.email || '—'}</TableCell>
+                                            <TableCell sx={{ fontWeight: 900, color: 'error.main' }}>{Number(sup.payable_balance || 0).toLocaleString()} {currency}</TableCell>
+                                            <TableCell align="center">
+                                                <Button 
+                                                    size="small" 
+                                                    variant="outlined" 
+                                                    color="primary"
+                                                    onClick={() => { setSelectedSupplierId(sup.id); setPaymentAmount(0); setOpenPayVendorDialog(true); }}
+                                                    sx={{ borderRadius: 2, mr: 1, mb: {xs: 1, sm: 0} }}
+                                                >
+                                                    LOG PAYMENT
+                                                </Button>
+                                                <Button 
+                                                    size="small" 
+                                                    variant="outlined" 
+                                                    color="secondary"
+                                                    onClick={() => { setSelectedSupplierForStatement(sup); setOpenVendorStatement(true); }}
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    VIEW LEDGER
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Card>
+
+                    {/* Dialogs for Vendors */}
+                    <Dialog open={openSupplierDialog} onClose={() => setOpenSupplierDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
+                        <DialogTitle sx={{ fontWeight: 900 }}>Register New Vendor</DialogTitle>
+                        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+                            <TextField label="Supplier Name" value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} fullWidth />
+                            <TextField label="Phone Number" value={supplierDetails.phone} onChange={e => setSupplierDetails({...supplierDetails, phone: e.target.value})} fullWidth />
+                            <TextField label="Opening Balance to Pay" type="number" value={supplierDetails.payable_balance} onChange={e => setSupplierDetails({...supplierDetails, payable_balance: e.target.value})} fullWidth />
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setOpenSupplierDialog(false)}>Cancel</Button>
+                            <Button variant="contained" onClick={async () => {
+                                const newTx = [];
+                                if (Number(supplierDetails.payable_balance) > 0) {
+                                    newTx.push({
+                                        id: Date.now().toString(),
+                                        date: new Date().toISOString().split('T')[0],
+                                        type: 'Opening Balance',
+                                        amount: Number(supplierDetails.payable_balance),
+                                        description: 'Initial balance'
+                                    });
+                                }
+                                await supabase.from('suppliers').insert([{ 
+                                    ...supplierDetails, 
+                                    payable_balance: Number(supplierDetails.payable_balance),
+                                    transactions: newTx
+                                }]);
+                                setOpenSupplierDialog(false);
+                            }}>SAVE VENDOR</Button>
+                        </DialogActions>
+                    </Dialog>
+
+                    <Dialog open={openPayVendorDialog} onClose={() => setOpenPayVendorDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
+                        <DialogTitle sx={{ fontWeight: 900 }}>Pay Vendor</DialogTitle>
+                        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+                            <Typography variant="body2">Record a payment made to reduce your outstanding balance.</Typography>
+                            <TextField label="Payment Amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} fullWidth />
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setOpenPayVendorDialog(false)}>Cancel</Button>
+                            <Button variant="contained" onClick={async () => {
+                                const sup = suppliers.find(s => s.id === selectedSupplierId);
+                                const newBalance = Math.max(0, Number(sup.payable_balance || 0) - Number(paymentAmount));
+                                const tx = {
+                                    id: Date.now().toString(),
+                                    date: new Date().toISOString().split('T')[0],
+                                    type: 'Payment Made',
+                                    amount: Number(paymentAmount),
+                                    description: 'Manual Payment'
+                                };
+                                const newTransactions = [...(sup.transactions || []), tx];
+                                await supabase.from('suppliers').update({ 
+                                    payable_balance: newBalance,
+                                    transactions: newTransactions
+                                }).eq('id', selectedSupplierId);
+                                setOpenPayVendorDialog(false);
+                            }}>POST PAYMENT</Button>
+                        </DialogActions>
+                    </Dialog>
+
+                    <Dialog open={openVendorStatement} onClose={() => setOpenVendorStatement(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+                        <DialogTitle sx={{ fontWeight: 900 }}>
+                            Vendor Ledger: {selectedSupplierForStatement?.name}
+                        </DialogTitle>
+                        <DialogContent>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 900 }}>DATE</TableCell>
+                                            <TableCell sx={{ fontWeight: 900 }}>TYPE</TableCell>
+                                            <TableCell sx={{ fontWeight: 900 }}>DESCRIPTION</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {(!selectedSupplierForStatement?.transactions || selectedSupplierForStatement.transactions.length === 0) ? (
+                                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4, opacity: 0.6 }}>No transaction history found</TableCell></TableRow>
+                                        ) : (
+                                            [...selectedSupplierForStatement.transactions].reverse().map((t, i) => (
+                                                <TableRow key={i} hover>
+                                                    <TableCell>{t.date}</TableCell>
+                                                    <TableCell><Chip label={t.type} size="small" variant="outlined" sx={{ fontWeight: 700 }} /></TableCell>
+                                                    <TableCell>{t.description}</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 800 }}>{t.amount?.toLocaleString()} {currency}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </DialogContent>
+                        <DialogActions sx={{ p: 2 }}>
+                            <Button onClick={() => setOpenVendorStatement(false)}>Close</Button>
+                        </DialogActions>
+                    </Dialog>
+                </Box>
+            )}
+
+            {/* TAB 4: Audit Log */}
+            {hubTab === 4 && (
                 <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>System Audit Trail</Typography>

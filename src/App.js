@@ -38,6 +38,7 @@ import TireList from "./components/TireList";
 import Dashboard from "./components/Dashboard";
 import SaleForm from "./components/SaleForm";
 import { AuthProvider, useAuth } from "./components/AuthContext";
+import { LanguageProvider, useLanguage } from "./components/LanguageContext";
 import Login from "./components/Login";
 import { supabase } from "./supabaseClient";
 import Reports from "./components/Reports";
@@ -112,6 +113,7 @@ const Logo = styled("div")(({ theme }) => ({
 
 const AppContent = () => {
   const { user, role, isAdmin, logout } = useAuth();
+  const { appLang, toggleAppLang } = useLanguage();
   const [tires, setTires] = useState([]);
   const [sales, setSales] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -123,6 +125,7 @@ const AppContent = () => {
   const [workers, setWorkers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -191,13 +194,14 @@ const AppContent = () => {
       fetchData('workers', setWorkers);
       fetchData('tasks', setTasks);
       fetchData('vehicles', setVehicles);
+      fetchData('suppliers', setSuppliers);
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
     const tables = [
       'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
       'customers', 'appointments', 'invoices', 'workers',
-      'tasks', 'vehicles', 'business_settings', 'master_data'
+      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data'
     ];
 
     const channels = tables.map(table => {
@@ -213,7 +217,7 @@ const AppContent = () => {
               tires: setTires, hotel_tires: setHotelTires,
               accounts: setAccounts, parts: setParts, customers: setCustomers,
               appointments: setAppointments, invoices: setInvoices,
-              workers: setWorkers, tasks: setTasks, vehicles: setVehicles
+              workers: setWorkers, tasks: setTasks, vehicles: setVehicles, suppliers: setSuppliers
             };
             if (setters[table]) {
               // Instead of full refetch, we could apply the delta, 
@@ -361,6 +365,17 @@ const AppContent = () => {
     }
   };
 
+  const saveQuotation = async (quoteData) => {
+    try {
+      const { error } = await supabase.from('quotations').insert([quoteData]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error("Error saving quotation: ", e);
+      return false;
+    }
+  };
+
   const handleDrawerToggle = () => setOpen(!open);
   const handleMenu = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -443,11 +458,11 @@ const AppContent = () => {
   );
   const renderComponent = () => {
     const commonProps = { businessProfile, masterData };
-    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
 
     switch (selectedComponent) {
       case "Dashboard": 
-        return isAdmin ? <Dashboard tires={tires} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
+        return isAdmin ? <Dashboard tires={tires} parts={parts} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
       
       case "InventoryHub": 
         return isAdmin ? (
@@ -472,13 +487,13 @@ const AppContent = () => {
         return <WorkerTracking workersList={workers || []} tasksList={tasks || []} setBillingDraft={setBillingDraft} setSelectedComponent={setSelectedComponent} {...commonProps} />;
       
       case "Finance": 
-        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} {...commonProps} /> : posComponent;
+        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} {...commonProps} /> : posComponent;
       
       case "Settings": 
         return isAdmin ? <Settings {...commonProps} /> : posComponent;
       
       default: 
-        return isAdmin ? <Dashboard tires={tires} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
+        return isAdmin ? <Dashboard tires={tires} parts={parts} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
     }
   };
 
@@ -521,6 +536,14 @@ const AppContent = () => {
                 }}
               >
                 QUICK POS
+              </Button>
+              <Button
+                variant="text"
+                size="small"
+                onClick={toggleAppLang}
+                sx={{ mr: 2, fontWeight: 900, fontSize: '0.9rem', color: 'primary.main', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 2 }}
+              >
+                {appLang === 'en' ? 'EN / සිංහල' : 'සිංහල / EN'}
               </Button>
               <Tooltip title="Account Settings">
                 <IconButton onClick={handleMenu} sx={{ p: 0.5 }}>
@@ -578,9 +601,11 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </LanguageProvider>
   );
 };
 
