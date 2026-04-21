@@ -20,7 +20,7 @@ import {
 const COLORS = ['#1a237e', '#f50057', '#00c853', '#ff6d00', '#6200ea', '#00b8d4', '#ffd600', '#ff1744'];
 
 
-function Dashboard({ tires = [], parts = [], sales = [], tasks = [], businessProfile }) {
+function Dashboard({ tires = [], parts = [], sales = [], tasks = [], suppliers = [], businessProfile }) {
   const currency = businessProfile?.currency || 'LKR';
   const [expanded, setExpanded] = useState(false);
   const [dataHealthOpen, setDataHealthOpen] = useState(false);
@@ -110,6 +110,7 @@ function Dashboard({ tires = [], parts = [], sales = [], tasks = [], businessPro
       { icon: <ShowChartIcon />, label: 'Net Profit', value: `${totalProfit.toLocaleString()} ${currency}` },
       { icon: <CategoryIcon />, label: 'Brand Portfolio', value: uniqueBrands },
       { icon: <TrendingDownIcon />, label: 'Stock Value', value: `${totalValue.toLocaleString()} ${currency}` },
+      { icon: <AttachMoneyIcon />, label: 'Supplier Debt', value: `${suppliers.reduce((s, a) => s + Number(a.payable_balance || 0), 0).toLocaleString()} ${currency}`, color: 'error.main' },
     ];
   }, [tires, parts, sales, tasks, insights, currency]);
 
@@ -205,11 +206,11 @@ function Dashboard({ tires = [], parts = [], sales = [], tasks = [], businessPro
                 bgcolor: 'background.paper',
                 borderRadius: 4,
                 cursor: stat.action ? 'pointer' : 'default',
-                p: 3,
+                p: { xs: 2, md: 3 },
                 height: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 2,
+                gap: 1.5,
                 transition: 'all 0.3s',
                 '&:hover': { transform: stat.action ? 'translateY(-4px)' : 'none', boxShadow: stat.action ? '0 10px 30px rgba(0,0,0,0.1)' : 'none' }
               }}
@@ -231,9 +232,23 @@ function Dashboard({ tires = [], parts = [], sales = [], tasks = [], businessPro
         <Grid container spacing={4} sx={{ mb: 4 }}>
           {statistics.slice(4).map((stat, index) => (
             <Grid item xs={12} sm={6} md={3} key={index + 4}>
-              <Card sx={{ p: 3, borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase' }}>{stat.label}</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 900, mt: 0.5 }}>{stat.value}</Typography>
+              <Card sx={{ 
+                p: 2.5, 
+                borderRadius: 4, 
+                border: '1px solid rgba(0,0,0,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                bgcolor: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                  <Avatar sx={{ bgcolor: 'rgba(26, 35, 126, 0.04)', color: 'primary.main', width: 40, height: 40, borderRadius: 2 }}>
+                    {stat.icon}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: 0.5 }}>{stat.label}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 900, mt: -0.5, fontSize: '1rem', color: stat.color || 'inherit' }}>{stat.value}</Typography>
+                  </Box>
               </Card>
             </Grid>
           ))}

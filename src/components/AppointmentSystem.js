@@ -169,12 +169,12 @@ const AppointmentSystem = ({ appointmentsList = [], vehiclesList = [] }) => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <DatePicker label="Appointment Date" value={formData.appointment_date} onChange={d => setFormData({ ...formData, appointment_date: d })} renderInput={ps => <TextField {...ps} fullWidth required variant="outlined" InputProps={{ sx: { borderRadius: 3 } }} />} />
+                    <DatePicker label="Appointment Date" value={formData.appointment_date} onChange={d => setFormData({ ...formData, appointment_date: d })} slotProps={{ textField: { fullWidth: true, required: true, variant: "outlined", InputProps: { sx: { borderRadius: 3 } } } }} />
                   </LocalizationProvider>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <TimePicker label="Requested Time" value={formData.appointment_time} onChange={t => setFormData({ ...formData, appointment_time: t })} renderInput={ps => <TextField {...ps} fullWidth required variant="outlined" InputProps={{ sx: { borderRadius: 3 } }} />} />
+                    <TimePicker label="Requested Time" value={formData.appointment_time} onChange={t => setFormData({ ...formData, appointment_time: t })} slotProps={{ textField: { fullWidth: true, required: true, variant: "outlined", InputProps: { sx: { borderRadius: 3 } } } }} />
                   </LocalizationProvider>
                 </Grid>
                 <Grid item xs={12}>

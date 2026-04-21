@@ -34,6 +34,7 @@ import BuildCircleIcon from "@mui/icons-material/BuildCircle";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import PersonIcon from "@mui/icons-material/Person";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import TireList from "./components/TireList";
 import Dashboard from "./components/Dashboard";
 import SaleForm from "./components/SaleForm";
@@ -45,7 +46,9 @@ import Reports from "./components/Reports";
 import Settings from "./components/Settings";
 import CustomerProfile from "./components/CustomerProfile";
 import WorkerTracking from "./components/WorkerTracking";
+import SupplierManagement from "./components/SupplierManagement";
 
+const SupplierIcon = LocalShippingIcon;
 const drawerWidth = 240;
 
 const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })(
@@ -335,21 +338,34 @@ const AppContent = () => {
     []
   );
 
+  const recordAudit = async (action, notes = {}) => {
+    try {
+      await supabase.from('audit_log').insert([{
+        action,
+        notes: JSON.stringify(notes),
+        record_id: notes.id || notes.brand || 'N/A'
+      }]);
+    } catch (e) { console.warn("[Audit] Failed:", e.message); }
+  };
+
   const addTire = async (tire) => {
     try {
-      await supabase.from('tires').insert([{ ...tire }]);
+      const { data, error } = await supabase.from('tires').insert([{ ...tire }]).select();
+      if (!error) recordAudit('Add Tire', { brand: tire.brand, size: tire.size });
     } catch (e) { console.error(e); }
   };
 
   const updateTire = async (tireId, updatedData) => {
     try {
-      await supabase.from('tires').update(updatedData).eq('id', tireId);
+      const { error } = await supabase.from('tires').update(updatedData).eq('id', tireId);
+      if (!error) recordAudit('Update Tire', { id: tireId, ...updatedData });
     } catch (e) { console.error(e); }
   };
 
   const deleteTire = async (tireId) => {
     try {
-      await supabase.from('tires').delete().eq('id', tireId);
+      const { error } = await supabase.from('tires').delete().eq('id', tireId);
+      if (!error) recordAudit('Delete Tire', { id: tireId });
     } catch (e) { console.error(e); }
   };
 
@@ -358,10 +374,65 @@ const AppContent = () => {
       const { data, error } = await supabase.rpc('process_sale', { sale_payload: invoice });
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
+      recordAudit('Process Sale', { customer: invoice.customer_name, total: invoice.total });
       return true;
     } catch (e) {
       console.error("Error processing sale: ", e);
       return false;
+    }
+  };
+
+  const addBulkGRN = async (grnPayload) => {
+    try {
+      const supplierId = (grnPayload.supplier_id && grnPayload.supplier_id !== '') ? grnPayload.supplier_id : null;
+      
+      const { data, error } = await supabase.rpc('process_bulk_grn', {
+        p_supplier_id: supplierId,
+        p_reference_number: grnPayload.reference_number,
+        p_notes: grnPayload.notes,
+        p_items: grnPayload.items
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+
+      recordAudit('Bulk GRN Processed', { 
+        supplier: suppliers.find(s => s.id === grnPayload.supplier_id)?.name,
+        items_count: grnPayload.items.length,
+        total: data.total_cost
+      });
+      return { success: true };
+    } catch (e) {
+      console.error("Error processing GRN: ", e);
+      let errorMsg = e.message;
+      if (e.message?.includes('not found') || e.code === 'PGRST116') {
+        errorMsg = "Critical: The 'process_bulk_grn' function is missing from your Supabase database. Please execute the SQL in schema.sql (lines 630-739) in your Supabase SQL Editor.";
+      }
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const processStockReturn = async (returnPayload) => {
+    try {
+      const { data, error } = await supabase.rpc('process_stock_return', {
+        p_supplier_id: returnPayload.supplier_id,
+        p_item_type: returnPayload.type,
+        p_item_id: returnPayload.item_id,
+        p_quantity: returnPayload.quantity,
+        p_reason: returnPayload.reason
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+
+      recordAudit('Stock Return Processed', { 
+        supplier: suppliers.find(s => s.id === returnPayload.supplier_id)?.name,
+        type: returnPayload.type,
+        qty: returnPayload.quantity,
+        credit: data.credit
+      });
+      return { success: true };
+    } catch (e) {
+      console.error("Error processing return: ", e);
+      return { success: false, error: e.message };
     }
   };
 
@@ -391,6 +462,7 @@ const AppContent = () => {
     { text: "Sales & POS", icon: <SellIcon />, component: "SaleForm" },
     { text: "Customer CRM", icon: <PersonIcon />, component: "CustomerCRM" },
     { text: "Workshop", icon: <BuildCircleIcon />, component: "Workshop" },
+    { text: "Vendors & GRN", icon: <SupplierIcon />, component: "Suppliers", adminOnly: true },
     { text: "Finance", icon: <AnalyticsIcon />, component: "Finance", adminOnly: true },
     { text: "Settings", icon: <SettingsIcon />, component: "Settings", adminOnly: true },
   ];
@@ -457,7 +529,7 @@ const AppContent = () => {
     </div>
   );
   const renderComponent = () => {
-    const commonProps = { businessProfile, masterData };
+    const commonProps = { businessProfile, masterData, suppliers, recordAudit };
     const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
 
     switch (selectedComponent) {
@@ -469,6 +541,8 @@ const AppContent = () => {
           <TireList 
             tires={tires || []} addTire={addTire} updateTire={updateTire} deleteTire={deleteTire} 
             parts={parts || []} hotelTires={hotelTires || []} 
+            addBulkGRN={addBulkGRN}
+            processStockReturn={processStockReturn}
             {...commonProps} 
           />
         ) : posComponent;
@@ -489,6 +563,9 @@ const AppContent = () => {
       case "Finance": 
         return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} {...commonProps} /> : posComponent;
       
+      case "Suppliers":
+        return isAdmin ? <SupplierManagement suppliers={suppliers || []} {...commonProps} /> : posComponent;
+
       case "Settings": 
         return isAdmin ? <Settings {...commonProps} /> : posComponent;
       
@@ -582,7 +659,17 @@ const AppContent = () => {
               </Menu>
             </Toolbar>
           </StyledAppBar>
-          <Drawer sx={{ width: drawerWidth, flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }} variant={isMobile ? "temporary" : "persistent"} anchor="left" open={open} onClose={() => setOpen(false)}>
+          <Drawer 
+            sx={{ width: drawerWidth, flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }} 
+            variant={isMobile ? "temporary" : "persistent"} 
+            anchor="left" 
+            open={open} 
+            onClose={() => setOpen(false)}
+            ModalProps={{
+              keepMounted: true, // Better open performance on mobile
+              disableScrollLock: true // Avoid jumping issues
+            }}
+          >
             {drawer}
           </Drawer>
           <Main open={open}>

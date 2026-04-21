@@ -1,0 +1,664 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Typography, Box, Grid, Card, CardContent, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  Chip, TextField, InputAdornment, Button, IconButton,
+  Collapse, Avatar, MenuItem, Select, FormControl, InputLabel, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert,
+  ToggleButton, ToggleButtonGroup, Divider
+} from '@mui/material';
+import {
+  LocalShipping as SupplierIcon,
+  Search as SearchIcon,
+  AttachMoney as CashIcon,
+  History as HistoryIcon,
+  Receipt as ReceiptIcon,
+  CalendarToday as CalendarIcon,
+  Payments as PaymentsIcon,
+  AccountBalance as BankIcon,
+  MoreVert as MoreVertIcon,
+  Print as PrintIcon,
+  Download as DownloadIcon,
+  Close as CloseIcon,
+  CreditCard as CheckIcon
+} from '@mui/icons-material';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
+
+const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) => {
+  const { isAdmin } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [openPayDialog, setOpenPayDialog] = useState(false);
+  const [openLedgerDialog, setOpenLedgerDialog] = useState(false);
+  const [openVendorDialog, setOpenVendorDialog] = useState(false);
+
+  // Transaction details state
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
+  const [detailsData, setDetailsData] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  
+  // Payment Form State
+  const [paymentData, setPaymentData] = useState({
+    amount: '',
+    method: 'Cash',
+    checkNumber: '',
+    date: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
+
+  // New Vendor Form State
+  const [newVendor, setNewVendor] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    opening_balance: 0
+  });
+
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [alert, setAlert] = useState({ open: false, message: '', severity: 'success' });
+
+  const currency = businessProfile?.currency || 'LKR';
+
+  // Filter suppliers
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.phone && s.phone.includes(searchTerm))
+    );
+  }, [suppliers, searchTerm]);
+
+  const fetchTransactionDetails = async (transaction) => {
+    setLoadingDetails(true);
+    setOpenDetailsDialog(true);
+    try {
+      if (transaction.type === 'Bulk GRN') {
+        const grnRef = transaction.description.split('Ref: ')[1];
+        if (!grnRef) throw new Error("No GRN Reference found.");
+        
+        const { data, error } = await supabase
+          .from('grn_items')
+          .select(`
+            quantity, cost_price, subtotal,
+            tires(brand, size),
+            parts(name)
+          `)
+          .eq('grn_id', grnRef);
+        if (error) throw error;
+        setDetailsData({ type: 'GRN', items: data, ref: grnRef });
+      } else if (transaction.type === 'Stock Return') {
+        const returnRef = transaction.description.split('Ref: ')[1];
+        if (!returnRef) throw new Error("No Return Reference found.");
+
+        const { data, error } = await supabase
+          .from('supplier_returns')
+          .select('*')
+          .eq('id', returnRef)
+          .single();
+        if (error) throw error;
+        setDetailsData({ type: 'Return', items: data.items, ref: returnRef, reason: data.reason });
+      }
+    } catch (e) {
+      console.error(e);
+      setDetailsData({ error: e.message });
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  // Fetch payment history when a supplier is selected
+  const fetchPaymentHistory = async (supplierId) => {
+    setLoadingHistory(true);
+    const { data, error } = await supabase
+      .from('supplier_payments')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .order('payment_date', { ascending: false });
+    
+    if (!error && data) setPaymentHistory(data);
+    setLoadingHistory(false);
+  };
+
+  const handleOpenPay = (supplier) => {
+    setSelectedSupplier(supplier);
+    setPaymentData({
+      amount: '',
+      method: 'Cash',
+      checkNumber: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
+    setOpenPayDialog(true);
+  };
+
+  const handleOpenLedger = (supplier) => {
+    setSelectedSupplier(supplier);
+    fetchPaymentHistory(supplier.id);
+    setOpenLedgerDialog(true);
+  };
+
+  const handleAddVendor = async () => {
+    if (!newVendor.name) {
+      setAlert({ open: true, message: 'Vendor name is required', severity: 'error' });
+      return;
+    }
+    try {
+      const { error } = await supabase.from('suppliers').insert([{
+        name: newVendor.name,
+        phone: newVendor.phone,
+        email: newVendor.email,
+        payable_balance: Number(newVendor.opening_balance || 0),
+        transactions: Number(newVendor.opening_balance) > 0 ? [{
+          id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          date: new Date().toISOString().split('T')[0],
+          type: 'Opening Balance',
+          amount: Number(newVendor.opening_balance),
+          description: 'Initial balance'
+        }] : []
+      }]);
+
+      if (error) throw error;
+      setAlert({ open: true, message: 'Vendor added successfully', severity: 'success' });
+      setOpenVendorDialog(false);
+      setNewVendor({ name: '', phone: '', email: '', opening_balance: 0 });
+      recordAudit('Vendor Registered', { name: newVendor.name });
+    } catch (e) {
+      setAlert({ open: true, message: e.message, severity: 'error' });
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!paymentData.amount || Number(paymentData.amount) <= 0) {
+      setAlert({ open: true, message: 'Invalid payment amount', severity: 'error' });
+      return;
+    }
+
+    try {
+      // 1. Insert Payment Record
+      const { data: paymentRecord, error: payErr } = await supabase.from('supplier_payments').insert([{
+        supplier_id: selectedSupplier.id,
+        amount: Number(paymentData.amount),
+        payment_method: paymentData.method,
+        check_number: paymentData.method === 'Check' ? paymentData.checkNumber : null,
+        payment_date: paymentData.date,
+        notes: paymentData.notes
+      }]).select().single();
+
+      if (payErr) throw payErr;
+
+      // 2. Update Supplier Balance & Ledger
+      const newBalance = Math.max(0, Number(selectedSupplier.payable_balance || 0) - Number(paymentData.amount));
+      const tx = {
+        id: paymentRecord.id,
+        date: paymentData.date,
+        type: 'Payment Made',
+        amount: Number(paymentData.amount),
+        description: `${paymentData.method} Payment ${paymentData.checkNumber ? '(Chq: ' + paymentData.checkNumber + ')' : ''}`.trim()
+      };
+
+      const { error: supErr } = await supabase.from('suppliers').update({
+        payable_balance: newBalance,
+        transactions: [...(selectedSupplier.transactions || []), tx]
+      }).eq('id', selectedSupplier.id);
+
+      if (supErr) throw supErr;
+
+      setAlert({ open: true, message: 'Payment recorded successfully!', severity: 'success' });
+      setOpenPayDialog(false);
+      recordAudit('Vendor Payment', { 
+        supplier: selectedSupplier.name, 
+        amount: paymentData.amount, 
+        method: paymentData.method,
+        check: paymentData.checkNumber 
+      });
+    } catch (e) {
+      setAlert({ open: true, message: e.message, severity: 'error' });
+    }
+  };
+
+  return (
+    <Box>
+      {/* Header Section */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Supplier Management</Typography>
+          <Typography variant="body1" color="text.secondary">Vendor ledgers, bulk supply records, and payment tracking</Typography>
+        </Box>
+        <Button 
+          variant="contained" 
+          startIcon={<SupplierIcon />} 
+          onClick={() => setOpenVendorDialog(true)}
+          sx={{ borderRadius: 3, fontWeight: 900 }}
+        >
+          NEW VENDOR
+        </Button>
+      </Box>
+
+      {/* Stats Cards */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ borderRadius: 4, bgcolor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.1)' }}>
+            <CardContent>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Total Payables</Typography>
+              <Typography variant="h3" sx={{ fontWeight: 900, color: 'error.main' }}>
+                {suppliers.reduce((s, x) => s + Number(x.payable_balance || 0), 0).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ borderRadius: 4, bgcolor: 'rgba(26, 35, 126, 0.05)', border: '1px solid rgba(26, 35, 126, 0.1)' }}>
+            <CardContent>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Active Suppliers</Typography>
+              <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                {suppliers.length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Filter Bar */}
+      <Card sx={{ borderRadius: 4, p: 2, mb: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search vendors by name or phone..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+            sx: { borderRadius: 3 }
+          }}
+        />
+      </Card>
+
+      {/* Suppliers Table */}
+      <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+        <Table>
+          <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 900, py: 2.5 }}>VENDOR NAME</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>CONTACT INFO</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>OUTSTANDING BALANCE</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>LAST TRANSACTION</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredSuppliers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
+                  <Typography variant="body1" color="text.secondary">No vendors found. Add your first supplier to start tracking.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredSuppliers.map((sup) => (
+                <TableRow key={sup.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Avatar sx={{ bgcolor: 'primary.light', color: 'primary.main', fontWeight: 900 }}>{sup.name[0]}</Avatar>
+                      <Typography sx={{ fontWeight: 800 }}>{sup.name}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{sup.phone || '—'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{sup.email || ''}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography sx={{ fontWeight: 900, color: Number(sup.payable_balance) > 0 ? 'error.main' : 'success.main' }}>
+                      {Number(sup.payable_balance || 0).toLocaleString()} {currency}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {sup.transactions?.length > 0 ? sup.transactions[sup.transactions.length - 1].date : '—'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {sup.transactions?.length > 0 ? sup.transactions[sup.transactions.length - 1].type : ''}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      <Button 
+                        size="small" 
+                        variant="contained" 
+                        color="primary" 
+                        onClick={() => handleOpenPay(sup)}
+                        disabled={Number(sup.payable_balance) <= 0}
+                        sx={{ borderRadius: 2, fontWeight: 800 }}
+                      >
+                        PAY
+                      </Button>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={() => handleOpenLedger(sup)}
+                        sx={{ borderRadius: 2, fontWeight: 800 }}
+                      >
+                        LEDGER
+                      </Button>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Payment Dialog */}
+      <Dialog open={openPayDialog} onClose={() => setOpenPayDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900, borderBottom: '1px solid rgba(0,0,0,0.05)', mb: 2 }}>
+          Record Payment: {selectedSupplier?.name}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+            <Box sx={{ p: 2, bgcolor: 'rgba(244, 67, 54, 0.05)', borderRadius: 2, border: '1px dashed rgba(244, 67, 54, 0.3)' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: 'error.main', display: 'block' }}>OUTSTANDING BALANCE</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{Number(selectedSupplier?.payable_balance || 0).toLocaleString()} {currency}</Typography>
+            </Box>
+
+            <TextField
+              label="Payment Amount"
+              fullWidth
+              type="number"
+              value={paymentData.amount}
+              onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">{currency}</InputAdornment>,
+                sx: { borderRadius: 3 }
+              }}
+            />
+
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', color: 'text.secondary' }}>PAYMENT METHOD</Typography>
+              <ToggleButtonGroup
+                value={paymentData.method}
+                exclusive
+                onChange={(_, v) => v && setPaymentData({ ...paymentData, method: v })}
+                fullWidth
+                size="small"
+              >
+                <ToggleButton value="Cash" sx={{ fontWeight: 800 }}>CASH</ToggleButton>
+                <ToggleButton value="Check" sx={{ fontWeight: 800 }}>CHECK</ToggleButton>
+                <ToggleButton value="Bank Transfer" sx={{ fontWeight: 800 }}>BANK</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            {paymentData.method === 'Check' && (
+              <TextField
+                label="Check Number"
+                fullWidth
+                value={paymentData.checkNumber}
+                onChange={(e) => setPaymentData({ ...paymentData, checkNumber: e.target.value })}
+                InputProps={{ sx: { borderRadius: 3 } }}
+              />
+            )}
+
+            <TextField
+              label="Payment Date"
+              type="date"
+              fullWidth
+              value={paymentData.date}
+              onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
+
+            <TextField
+              label="Notes"
+              fullWidth
+              multiline
+              rows={2}
+              value={paymentData.notes}
+              onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button onClick={() => setOpenPayDialog(false)} sx={{ fontWeight: 700 }}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmitPayment} sx={{ borderRadius: 3, fontWeight: 900, px: 3 }}>POST PAYMENT</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Ledger Dialog */}
+      <Dialog 
+        open={openLedgerDialog} 
+        onClose={() => setOpenLedgerDialog(false)} 
+        maxWidth="md" 
+        fullWidth 
+        PaperProps={{ sx: { borderRadius: 4, minHeight: '80vh' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'primary.main', color: '#fff' }}>
+          Vendor Ledger: {selectedSupplier?.name}
+          <IconButton onClick={() => setOpenLedgerDialog(false)} sx={{ color: '#fff' }}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ p: 3, display: 'flex', gap: 2, bgcolor: 'rgba(26, 35, 126, 0.02)' }}>
+             <Box sx={{ flex: 1, p: 2, bgcolor: '#fff', borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+               <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>TOTAL PAYABLE</Typography>
+               <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{Number(selectedSupplier?.payable_balance || 0).toLocaleString()} {currency}</Typography>
+             </Box>
+             <Box sx={{ flex: 1, p: 2, bgcolor: '#fff', borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+               <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>TOTAL TRANSACTIONS</Typography>
+               <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>{selectedSupplier?.transactions?.length || 0}</Typography>
+             </Box>
+          </Box>
+
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <HistoryIcon color="primary" /> Full Transaction History
+            </Typography>
+            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+              <Table size="small">
+                <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 900 }}>DATE</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>TYPE</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>DESCRIPTION</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {[...(selectedSupplier?.transactions || [])].reverse().map((t, i) => (
+                    <TableRow key={i} hover>
+                      <TableCell sx={{ fontWeight: 700 }}>{t.date}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={t.type} 
+                          size="small" 
+                          variant="outlined" 
+                          color={t.type.includes('Payment') ? 'success' : 'primary'}
+                          sx={{ fontWeight: 800, fontSize: '0.65rem' }} 
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: 'text.secondary' }}>
+                        {t.description}
+                        {(t.type === 'Bulk GRN' || t.type === 'Stock Return') && (
+                          <Button 
+                            size="small" 
+                            variant="text" 
+                            onClick={() => fetchTransactionDetails(t)}
+                            sx={{ ml: 1, p: 0, minWidth: 0, fontSize: '0.7rem', fontWeight: 700 }}
+                          >
+                            Details
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 900, color: t.type.includes('Payment') ? 'success.main' : 'error.main' }}>
+                        {t.type.includes('Payment') ? '-' : '+'}{Number(t.amount || 0).toLocaleString()} {currency}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!selectedSupplier?.transactions || selectedSupplier.transactions.length === 0) && (
+                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}>No transactions recorded.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Typography variant="h6" sx={{ fontWeight: 900, mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PaymentsIcon color="primary" /> Payment Audit Records
+            </Typography>
+            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+              <Table size="small">
+                <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 900 }}>DATE</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>METHOD</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>REF / CHECK #</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingHistory ? (
+                     <TableRow><TableCell colSpan={4} align="center" sx={{ py: 2 }}>Loading history...</TableCell></TableRow>
+                  ) : paymentHistory.length > 0 ? (
+                    paymentHistory.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>{new Date(p.payment_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                             {p.payment_method === 'Cash' ? <CashIcon fontSize="small" color="success" /> : <BankIcon fontSize="small" color="primary" />}
+                             <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.payment_method}</Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>{p.check_number || p.reference_number || '—'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 900 }}>{Number(p.amount).toLocaleString()} {currency}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}>No audit records found.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+          <Button onClick={() => setOpenLedgerDialog(false)} sx={{ fontWeight: 800 }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Vendor Dialog */}
+      <Dialog open={openVendorDialog} onClose={() => setOpenVendorDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Register New Vendor</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+            <TextField
+              label="Vendor Name *"
+              fullWidth
+              value={newVendor.name}
+              onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
+            <TextField
+              label="Phone Number"
+              fullWidth
+              value={newVendor.phone}
+              onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
+            <TextField
+              label="Email Address"
+              fullWidth
+              value={newVendor.email}
+              onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
+            <TextField
+              label="Opening Payable Balance"
+              type="number"
+              fullWidth
+              value={newVendor.opening_balance}
+              onChange={(e) => setNewVendor({ ...newVendor, opening_balance: e.target.value })}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">{currency}</InputAdornment>,
+                sx: { borderRadius: 3 }
+              }}
+              helperText="Add any amount you currently owe this vendor"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setOpenVendorDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddVendor} sx={{ borderRadius: 3, fontWeight: 900, px: 3 }}>SAVE VENDOR</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Transaction Details Dialog */}
+      <Dialog open={openDetailsDialog} onClose={() => setOpenDetailsDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+          Transaction Details
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {loadingDetails ? (
+            <Typography sx={{ py: 4, textAlign: 'center' }}>Loading details...</Typography>
+          ) : detailsData?.error ? (
+            <Alert severity="error">{detailsData.error}</Alert>
+          ) : detailsData ? (
+            <Box>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(26, 35, 126, 0.04)', borderRadius: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Reference</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{detailsData.ref}</Typography>
+                {detailsData.reason && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Reason</Typography>
+                    <Typography variant="body2">{detailsData.reason}</Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800 }}>Item</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Qty</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>Cost</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {detailsData.type === 'GRN' ? (
+                      detailsData.items.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            {item.tires ? `${item.tires.brand} ${item.tires.size}` : item.parts?.name}
+                          </TableCell>
+                          <TableCell align="center">{item.quantity}</TableCell>
+                          <TableCell align="right">{Number(item.cost_price).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      detailsData.items.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell align="center">{item.quantity}</TableCell>
+                          <TableCell align="right">{Number(item.unit_cost).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          ) : (
+            <Typography>No details available.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenDetailsDialog(false)} sx={{ fontWeight: 700 }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={alert.open} autoHideDuration={4000} onClose={() => setAlert({ ...alert, open: false })}>
+        <Alert severity={alert.severity} sx={{ borderRadius: 3, fontWeight: 800 }}>{alert.message}</Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default SupplierManagement;

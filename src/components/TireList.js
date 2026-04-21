@@ -5,7 +5,7 @@ import {
   TableContainer, TableHead, TableRow, Chip, Divider, Autocomplete,
   Avatar, Card, Tab, Tabs, Alert, IconButton, ToggleButton,
   ToggleButtonGroup, Checkbox, Dialog, DialogTitle, DialogContent,
-  DialogActions, Tooltip, Badge, LinearProgress
+  DialogActions, Tooltip, Badge, LinearProgress, Paper
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -15,7 +15,7 @@ import {
   Category as CategoryIcon, TrendingUp as MarginIcon,
   Assignment as POIcon, Print as PrintIcon, Add as AddIcon,
   Remove as RemoveIcon, FilterList as FilterIcon,
-  ContentCopy as CopyIcon, Close as CloseIcon
+  ContentCopy as CopyIcon, Close as CloseIcon, AssignmentReturn as ReturnIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabaseClient';
@@ -37,9 +37,10 @@ const stockColor = (qty, threshold) => {
 };
 
 const TireList = ({
-  tires = [], addTire, updateTire, deleteTire,
-  parts = [], hotelTires = [],
-  masterData, businessProfile
+  tires = [], parts = [], hotelTires = [],
+  addTire, updateTire, deleteTire,
+  masterData, businessProfile, suppliers = [], recordAudit,
+  addBulkGRN, processStockReturn
 }) => {
   const { isAdmin } = useAuth();
   const [activeTab, setActiveTab]       = useState('stock');
@@ -56,14 +57,15 @@ const TireList = ({
   /* ── Order Note ── */
   const [orderItems,     setOrderItems]     = useState([]);      // { id, type, name, currentStock, orderQty }
   const [isPOOpen,       setIsPOOpen]       = useState(false);
-  const [poSupplier,     setPoSupplier]     = useState('');
   const [poNotes,        setPoNotes]        = useState('');
+  const [poSupplier,     setPoSupplier]     = useState('');
 
   /* ── Tire GRN state ── */
   const [grnData, setGrnData] = useState({
     brand:'',model:'',size:'',tire_category:'New',
     stock:'',cost_price:'',price:'',vehicle_type:'',
     dot_code:'',origin:'',thread_pattern:'',
+    supplier_id: ''
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading,    setUploading]    = useState(false);
@@ -71,9 +73,25 @@ const TireList = ({
   /* ── Parts GRN state ── */
   const [partGrn, setPartGrn] = useState({
     name:'',category:'Consumable',customCategory:'',
-    stock:'',cost_price:'',price:'',supplier:'',notes:'',
+    stock:'',cost_price:'',price:'',supplier_id:'',notes:'',
   });
   const [partSaving, setPartSaving] = useState(false);
+  
+  /* ── Bulk GRN state ── */
+  const [grnItems, setGrnItems] = useState([]); // Array of tires/parts for bulk submission
+  const [grnReference, setGrnReference] = useState('');
+  const [grnNotes, setGrnNotes] = useState('');
+  const [isFinalizingGRN, setIsFinalizingGRN] = useState(false);
+ 
+  /* ── Returns state ── */
+  const [returnData, setReturnData] = useState({
+    supplier_id: '',
+    type: 'tire', // tire|part
+    tire_id: '',
+    part_id: '',
+    quantity: 1,
+    reason: ''
+  });
 
   const tireBrands   = masterData?.brands   || [];
   const vehicleTypes = masterData?.vehicles || [];
@@ -105,44 +123,30 @@ const TireList = ({
     if (!grnData.brand || !grnData.size || !grnData.stock) {
       setAlert({ open:true, message:'Complete all required fields.', severity:'error' }); return;
     }
-    setUploading(true);
-    try {
-      let imageUrl = null;
-      if (selectedFile) {
-        const blob = await compressImage(selectedFile);
-        const name = `${Date.now()}_${selectedFile.name}`;
-        const { error: uploadError } = await supabase.storage.from('tires').upload(name, blob);
-        if (uploadError) throw uploadError;
-        imageUrl = supabase.storage.from('tires').getPublicUrl(name).data.publicUrl;
-      }
-      const existing = tires.find(t =>
-        (t.brand||'').toLowerCase()===(grnData.brand||'').toLowerCase() &&
-        (t.model||'').toLowerCase()===(grnData.model||'').toLowerCase() &&
-        (t.size ||'').toLowerCase()===(grnData.size ||'').toLowerCase() &&
-        (t.vehicle_type ||'').toLowerCase()===(grnData.vehicle_type ||'').toLowerCase() &&
-        (t.tire_category||'').toLowerCase()===(grnData.tire_category||'').toLowerCase()
-      );
-      if (existing) {
-        await updateTire(existing.id, {
-          stock: parseInt(existing.stock||0) + parseInt(grnData.stock),
-          cost_price: parseFloat(grnData.cost_price || existing.cost_price || 0),
-          price:      parseFloat(grnData.price      || existing.price      || 0),
-          ...(grnData.dot_code        && { dot_code:       grnData.dot_code }),
-          ...(grnData.origin          && { origin:         grnData.origin }),
-          ...(grnData.thread_pattern  && { thread_pattern: grnData.thread_pattern }),
-          ...(imageUrl && { images: [...(existing.images||[]), imageUrl] }),
-        });
-        setAlert({ open:true, message:`✅ Restocked — ${existing.brand} ${existing.size} updated.`, severity:'success' });
-      } else {
-        await addTire({ ...grnData, images: imageUrl ? [imageUrl] : [],
-          stock: parseInt(grnData.stock), cost_price: parseFloat(grnData.cost_price||0), price: parseFloat(grnData.price||0) });
-        setAlert({ open:true, message:'✅ New tire added to inventory & POS.', severity:'success' });
-      }
-      setGrnData({ brand:'',model:'',size:'',tire_category:'New',stock:'',cost_price:'',price:'',vehicle_type:'',dot_code:'',origin:'',thread_pattern:'' });
-      setSelectedFile(null); setActiveTab('stock');
-    } catch(err) {
-      setAlert({ open:true, message:'Failed: '+err.message, severity:'error' });
-    } finally { setUploading(false); }
+    
+    // Instead of submitting, add to Bulk GRN Cart
+    const newItem = {
+      ...grnData,
+      type: 'tire',
+      id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
+      quantity: parseInt(grnData.stock),
+      cost_price: parseFloat(grnData.cost_price || 0),
+      price: parseFloat(grnData.price || 0),
+      label: `${grnData.brand} ${grnData.size} (${grnData.model || 'No Model'})`,
+      images: grnData.images || [],
+      thread_pattern: grnData.thread_pattern || '',
+      origin: grnData.origin || '',
+      dot_code: grnData.dot_code || ''
+    };
+
+    setGrnItems(prev => [...prev, newItem]);
+    setAlert({ open: true, message: 'Added to GRN list', severity: 'success' });
+    setGrnData({ 
+      brand:'', model:'', size:'', tire_category:'New',
+      stock:'', cost_price:'', price:'', vehicle_type:'',
+      dot_code:'', origin:'', thread_pattern:'', 
+      supplier_id: grnData.supplier_id // Keep supplier same for convenience
+    });
   };
 
   /* ─── Parts GRN ─── */
@@ -151,41 +155,92 @@ const TireList = ({
     if (!partGrn.name || !partGrn.stock || !partGrn.price) {
       setAlert({ open:true, message:'Name, Quantity and Sell Price required.', severity:'error' }); return;
     }
-    setPartSaving(true);
+
+    const finalCat = partGrn.category === 'Custom' ? (partGrn.customCategory||'Custom') : partGrn.category;
+    
+    const newItem = {
+      ...partGrn,
+      type: 'part',
+      category: finalCat,
+      id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      quantity: parseInt(partGrn.stock),
+      cost_price: parseFloat(partGrn.cost_price || 0),
+      price: parseFloat(partGrn.price || 0),
+      label: `${partGrn.name} (${finalCat})`
+    };
+
+    setGrnItems(prev => [...prev, newItem]);
+    setAlert({ open: true, message: 'Added to GRN list', severity: 'success' });
+    setPartGrn({ 
+      name:'', category:'Consumable', customCategory:'', 
+      stock:'', cost_price:'', price:'', 
+      supplier_id: partGrn.supplier_id, notes:'' 
+    });
+  };
+
+  const finalizeBulkGRN = async () => {
+    if (grnItems.length === 0) return;
+    if (!grnItems[0].supplier_id) {
+      setAlert({ open: true, message: 'Please select a supplier for the items', severity: 'error' });
+      return;
+    }
+
+    setIsFinalizingGRN(true);
     try {
-      const finalCat = partGrn.category === 'Custom' ? (partGrn.customCategory||'Custom') : partGrn.category;
-      const existing = parts.find(p =>
-        (p.name||'').toLowerCase()===(partGrn.name||'').toLowerCase() &&
-        (p.category||'').toLowerCase()===finalCat.toLowerCase()
-      );
-      if (existing) {
-        await supabase.from('parts').update({
-          stock:      parseInt(existing.stock||0)+parseInt(partGrn.stock),
-          cost_price: parseFloat(partGrn.cost_price || existing.cost_price || 0),
-          price:      parseFloat(partGrn.price),
-        }).eq('id', existing.id);
-        setAlert({ open:true, message:`✅ Restocked — ${existing.name} updated.`, severity:'success' });
+      const result = await addBulkGRN({
+        supplier_id: grnItems[0].supplier_id,
+        reference_number: grnReference,
+        notes: grnNotes,
+        items: grnItems
+      });
+
+      if (result.success) {
+        setAlert({ open: true, message: '✅ Bulk GRN processed successfully!', severity: 'success' });
+        setGrnItems([]);
+        setGrnReference('');
+        setGrnNotes('');
+        setActiveTab('stock');
       } else {
-        await supabase.from('parts').insert([{
-          name: partGrn.name, category: finalCat,
-          stock: parseInt(partGrn.stock),
-          cost_price: parseFloat(partGrn.cost_price||0),
-          price: parseFloat(partGrn.price),
-          created_at: new Date().toISOString(),
-        }]);
-        setAlert({ open:true, message:`✅ "${partGrn.name}" added — visible in POS Parts & All tabs.`, severity:'success' });
+        throw new Error(result.error || 'Failed to process GRN');
       }
-      setPartGrn({ name:'',category:'Consumable',customCategory:'',stock:'',cost_price:'',price:'',supplier:'',notes:'' });
-      setActiveTab('parts');
-    } catch(err) {
-      setAlert({ open:true, message:'Failed: '+err.message, severity:'error' });
-    } finally { setPartSaving(false); }
+    } catch (err) {
+      setAlert({ open: true, message: 'Error: ' + err.message, severity: 'error' });
+    } finally {
+      setIsFinalizingGRN(false);
+    }
   };
 
   const handleDeleteTire = async (id) => {
     if (!window.confirm('Delete this item?')) return;
     try { await deleteTire(id); setAlert({ open:true, message:'Deleted.', severity:'info' }); }
     catch  { setAlert({ open:true, message:'Delete failed.',  severity:'error' }); }
+  };
+
+  const handleReturnSubmit = async (e) => {
+    e.preventDefault();
+    if (!returnData.supplier_id || !returnData.quantity || (!returnData.tire_id && !returnData.part_id)) {
+      setAlert({ open:true, message:'Supplier, Item and Quantity are required.', severity:'error' }); return;
+    }
+
+    try {
+      const result = await processStockReturn({
+        supplier_id: returnData.supplier_id,
+        type: returnData.type,
+        item_id: returnData.type === 'tire' ? returnData.tire_id : returnData.part_id,
+        quantity: returnData.quantity,
+        reason: returnData.reason
+      });
+
+      if (result.success) {
+        setAlert({ open:true, message:'✅ Return processed atomically and ledger updated.', severity:'success' });
+        setReturnData({ supplier_id:'', type:'tire', tire_id:'', part_id:'', quantity:1, reason:'' });
+        setActiveTab('stock');
+      } else {
+        throw new Error(result.error || 'Failed to process return');
+      }
+    } catch(err) {
+      setAlert({ open:true, message:'Failed: '+err.message, severity:'error' });
+    }
   };
 
   /* ─── Combined inventory list ─── */
@@ -409,6 +464,7 @@ const TireList = ({
         {isAdmin && <Tab icon={<GRNIcon />} iconPosition="start" label="Log GRN" value="grn" />}
         <Tab icon={<PartsIcon />} iconPosition="start" label="Parts &amp; Consumables" value="parts" />
         <Tab icon={<HotelIcon />} iconPosition="start" label="Tire Hotel" value="hotel" />
+        {isAdmin && <Tab icon={<ReturnIcon />} iconPosition="start" label="Stock Returns" value="returns" />}
       </Tabs>
 
       {/* ════ STOCK MANAGEMENT ════ */}
@@ -564,17 +620,17 @@ const TireList = ({
                           />
                         </TableCell>
 
-                        <TableCell>
-                          <Box sx={{ display:'flex', alignItems:'center', gap:1.5 }}>
+                        <TableCell sx={{ py: 1 }}>
+                          <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
                             <Avatar
                               src={item.images?.[0]}
-                              sx={{ width:36, height:36, bgcolor:'rgba(26,35,126,0.06)', color:'primary.main', fontWeight:900, borderRadius:2, fontSize:'0.85rem' }}
+                              sx={{ width:32, height:32, bgcolor:'rgba(26,35,126,0.06)', color:'primary.main', fontWeight:900, borderRadius:1.5, fontSize:'0.75rem' }}
                             >
                               {item.name?.[0]}
                             </Avatar>
                             <Box>
-                              <Typography sx={{ fontWeight:900, fontSize:'0.9rem' }}>{item.name}</Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight:600 }}>{item.label}</Typography>
+                              <Typography sx={{ fontWeight:900, fontSize:'0.85rem', lineHeight:1.2 }}>{item.name}</Typography>
+                              <Typography variant="caption" sx={{ color:'text.secondary', fontWeight:600, fontSize:'0.7rem' }}>{item.label}</Typography>
                             </Box>
                           </Box>
                         </TableCell>
@@ -711,6 +767,8 @@ const TireList = ({
                     <Autocomplete
                       options={tires}
                       getOptionLabel={(option) => `${option.brand || ''} ${option.model || ''} - ${option.size || ''}`.trim()}
+                      getOptionKey={(option) => option.id}
+                      isOptionEqualToValue={(option, value) => option.id === value?.id}
                       onChange={(e, v) => {
                         if (v) {
                           setGrnData({
@@ -764,6 +822,23 @@ const TireList = ({
                           onInputChange={(_,v)=>setGrnData({...grnData,vehicle_type:v})}
                         />
                       </Grid>
+
+                      <Grid item xs={12} sm={8}>
+                        <FormControl fullWidth>
+                          <InputLabel>Supplier / Source *</InputLabel>
+                          <Select
+                            value={grnData.supplier_id}
+                            onChange={e => setGrnData({...grnData, supplier_id: e.target.value})}
+                            label="Supplier / Source *"
+                            required
+                          >
+                            <MenuItem value=""><em>None (Independent Stock)</em></MenuItem>
+                            {suppliers.map(s => (
+                              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
                       <Grid item xs={12} sm={4}>
                         <TextField fullWidth label="Country of Origin" value={grnData.origin} onChange={e=>setGrnData({...grnData,origin:e.target.value})} placeholder="e.g. Japan" />
                       </Grid>
@@ -798,7 +873,7 @@ const TireList = ({
                             <MarginIcon sx={{color:'success.main'}}/> 
                             <Box>
                               <Typography variant="caption" sx={{fontWeight:800,color:'success.main',textTransform:'uppercase'}}>Profit Preview</Typography>
-                              <Typography variant="body2" sx={{fontWeight:900}}>
+                              <Typography variant="body2" component="div" sx={{fontWeight:900, display: 'flex', alignItems: 'center', gap: 1}}>
                                 +{(parseFloat(grnData.price||0)-parseFloat(grnData.cost_price||0)).toLocaleString()} {currency} / unit &nbsp;·&nbsp; <MarginChip margin={tireMargin}/>
                               </Typography>
                             </Box>
@@ -815,8 +890,8 @@ const TireList = ({
                       )}
                       <Grid item xs={12}>
                         <Divider sx={{my:1}}/>
-                        <Button variant="contained" fullWidth size="large" type="submit" disabled={uploading} sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<GRNIcon/>}>
-                          {uploading ? 'Uploading...' : 'COMMIT TIRE GRN — UPDATE STOCK & POS'}
+                        <Button variant="contained" fullWidth size="large" type="submit" sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<AddIcon/>}>
+                          ADD TO GRN LIST
                         </Button>
                       </Grid>
                     </Grid>
@@ -846,6 +921,8 @@ const TireList = ({
                     <Autocomplete
                       options={parts}
                       getOptionLabel={(option) => `${option.name || ''} (${option.category || ''})`}
+                      getOptionKey={(option) => option.id}
+                      isOptionEqualToValue={(option, value) => option.id === value?.id}
                       onChange={(e, v) => {
                         if (v) {
                           setPartGrn({
@@ -891,7 +968,20 @@ const TireList = ({
                         <TextField fullWidth type="number" label={`Sell Price (${currency}) *`} value={partGrn.price} onChange={e=>setPartGrn({...partGrn,price:e.target.value})} required helperText="POS price" inputProps={{min:0,step:0.01}} />
                       </Grid>
                       <Grid item xs={12} sm={6}>
-                        <TextField fullWidth label="Supplier / Source" value={partGrn.supplier} onChange={e=>setPartGrn({...partGrn,supplier:e.target.value})} placeholder="Optional" />
+                        <FormControl fullWidth>
+                          <InputLabel>Supplier / Source *</InputLabel>
+                          <Select
+                            value={partGrn.supplier_id}
+                            onChange={e => setPartGrn({...partGrn, supplier_id: e.target.value})}
+                            label="Supplier / Source *"
+                            required
+                          >
+                            <MenuItem value=""><em>None (Independent Stock)</em></MenuItem>
+                            {suppliers.map(s => (
+                              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <TextField fullWidth label="Notes / Part Number" value={partGrn.notes} onChange={e=>setPartGrn({...partGrn,notes:e.target.value})} placeholder="OEM ref, serial, etc." />
@@ -902,7 +992,7 @@ const TireList = ({
                             <MarginIcon sx={{color:'success.main'}}/>
                             <Box>
                               <Typography variant="caption" sx={{fontWeight:800,color:'success.main',textTransform:'uppercase'}}>Profit Preview</Typography>
-                              <Typography variant="body2" sx={{fontWeight:900}}>
+                              <Typography variant="body2" component="div" sx={{fontWeight:900, display: 'flex', alignItems: 'center', gap: 1}}>
                                 +{(parseFloat(partGrn.price||0)-parseFloat(partGrn.cost_price||0)).toLocaleString()} {currency} / unit &nbsp;·&nbsp; <MarginChip margin={partMargin}/>
                               </Typography>
                             </Box>
@@ -919,12 +1009,92 @@ const TireList = ({
                       )}
                       <Grid item xs={12}>
                         <Divider sx={{my:1}}/>
-                        <Button variant="contained" color="secondary" fullWidth size="large" type="submit" disabled={partSaving} sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<CategoryIcon/>}>
-                          {partSaving ? 'Saving...' : 'COMMIT PARTS GRN — ADD TO INVENTORY & POS'}
+                        <Button variant="contained" color="secondary" fullWidth size="large" type="submit" sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<AddIcon/>}>
+                          ADD TO GRN LIST
                         </Button>
                       </Grid>
                     </Grid>
                   </form>
+                </Card>
+              </Grid>
+            </Grid>
+          )}
+          {/* GRN DRAFT CART */}
+          {grnItems.length > 0 && (
+            <Grid container justifyContent="center" sx={{ mt: 4 }}>
+              <Grid item xs={12} md={9}>
+                <Card sx={{ borderRadius: 4, p: 4, border: '2px solid', borderColor: 'primary.main' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <StockIcon color="primary" /> Finalize Shipment Reception
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Review the items below. Once you click "COMMIT SHIPMENT", all items will be added to stock and the supplier balance will be updated in a single invoice.
+                  </Typography>
+
+                  <TableContainer component={Paper} sx={{ borderRadius: 2, mb: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 900 }}>ITEM</TableCell>
+                          <TableCell sx={{ fontWeight: 900 }}>QTY</TableCell>
+                          <TableCell sx={{ fontWeight: 900 }}>COST</TableCell>
+                          <TableCell sx={{ fontWeight: 900 }}>SUBTOTAL</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 900 }}>REMOVE</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {grnItems.map((item, idx) => (
+                          <TableRow key={item.id}>
+                            <TableCell sx={{ fontWeight: 700 }}>{item.label}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{item.cost_price.toLocaleString()}</TableCell>
+                            <TableCell sx={{ fontWeight: 800 }}>{(item.quantity * item.cost_price).toLocaleString()}</TableCell>
+                            <TableCell align="right">
+                              <IconButton size="small" color="error" onClick={() => setGrnItems(prev => prev.filter((_, i) => i !== idx))}>
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                          <TableCell colSpan={3} sx={{ fontWeight: 900, textAlign: 'right' }}>GRAND TOTAL:</TableCell>
+                          <TableCell colSpan={2} sx={{ fontWeight: 900, color: 'primary.main', fontSize: '1.1rem' }}>
+                            {grnItems.reduce((acc, curr) => acc + (curr.quantity * curr.cost_price), 0).toLocaleString()} {currency}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField 
+                        fullWidth label="Reference / Invoice #" 
+                        value={grnReference} onChange={e => setGrnReference(e.target.value)} 
+                        placeholder="e.g. INV-2024-001"
+                        InputProps={{ sx: { borderRadius: 3 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField 
+                        fullWidth label="Shipment Notes" 
+                        value={grnNotes} onChange={e => setGrnNotes(e.target.value)} 
+                        placeholder="e.g. Received by Kamal"
+                        InputProps={{ sx: { borderRadius: 3 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button 
+                        fullWidth variant="contained" color="primary" size="large"
+                        disabled={isFinalizingGRN}
+                        onClick={finalizeBulkGRN}
+                        sx={{ py: 2, borderRadius: 3, fontWeight: 900, mt: 1 }}
+                        startIcon={<GRNIcon />}
+                      >
+                        {isFinalizingGRN ? 'Processing...' : 'COMMIT SHIPMENT — UPDATED ALL STOCK & SUPPLIER DEBT'}
+                      </Button>
+                    </Grid>
+                  </Grid>
                 </Card>
               </Grid>
             </Grid>
@@ -1028,6 +1198,104 @@ const TireList = ({
       <Snackbar open={alert.open} autoHideDuration={6000} onClose={()=>setAlert({...alert,open:false})}>
         <Alert severity={alert.severity} sx={{borderRadius:3,fontWeight:700}}>{alert.message}</Alert>
       </Snackbar>
+      {/* ════ RETURNS ════ */}
+      {activeTab === 'returns' && isAdmin && (
+        <Grid container justifyContent="center" sx={{ mt: 4 }}>
+          <Grid item xs={12} md={8}>
+            <Card sx={{ borderRadius:4, p:4 }}>
+              <Box sx={{ display:'flex', alignItems:'center', gap:2, mb:3 }}>
+                <Avatar sx={{ bgcolor:'error.main', width:48, height:48 }}><ReturnIcon /></Avatar>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight:900 }}>GRN Return to Supplier</Typography>
+                  <Typography variant="body2" color="text.secondary">Send stock back to vendor and reduce outstanding balance.</Typography>
+                </Box>
+              </Box>
+
+              <form onSubmit={handleReturnSubmit}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Target Supplier</InputLabel>
+                      <Select
+                        value={returnData.supplier_id}
+                        onChange={e => setReturnData({...returnData, supplier_id: e.target.value})}
+                        label="Target Supplier"
+                        required
+                      >
+                        {suppliers.map(s => (
+                          <MenuItem key={s.id} value={s.id}>{s.name} (Debt: {Number(s.payable_balance||0).toLocaleString()} {currency})</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Item Type</InputLabel>
+                      <Select
+                        value={returnData.type}
+                        onChange={e => setReturnData({...returnData, type: e.target.value, tire_id: '', part_id: ''})}
+                        label="Item Type"
+                      >
+                        <MenuItem value="tire">Tire</MenuItem>
+                        <MenuItem value="part">Spare Part</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    {returnData.type === 'tire' ? (
+                      <Autocomplete
+                        options={tires}
+                        getOptionLabel={(o) => `${o.brand} ${o.size} (${o.stock} in stock)`}
+                        getOptionKey={(o) => o.id}
+                        onChange={(_, v) => setReturnData({...returnData, tire_id: v?.id || ''})}
+                        renderInput={(p) => <TextField {...p} label="Select Tire" required />}
+                      />
+                    ) : (
+                      <Autocomplete
+                        options={parts}
+                        getOptionLabel={(o) => `${o.name} (${o.stock} in stock)`}
+                        getOptionKey={(o) => o.id}
+                        onChange={(_, v) => setReturnData({...returnData, part_id: v?.id || ''})}
+                        renderInput={(p) => <TextField {...p} label="Select Part" required />}
+                      />
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth type="number" label="Quantity to Return"
+                      value={returnData.quantity}
+                      onChange={e => setReturnData({...returnData, quantity: e.target.value})}
+                      required
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth label="Reason for Return"
+                      value={returnData.reason}
+                      onChange={e => setReturnData({...returnData, reason: e.target.value})}
+                      placeholder="e.g. Defective, Wrong Item"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Button
+                      type="submit" fullWidth variant="contained" color="error"
+                      sx={{ py:2, borderRadius:3, fontWeight:900 }}
+                    >
+                      PROCESS RETURN & REDUCE DEBT
+                    </Button>
+                  </Grid>
+                </Grid>
+              </form>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
     </Box>
   );
 };

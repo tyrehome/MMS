@@ -29,7 +29,7 @@ import {
     LocalShipping as SupplierIcon
 } from '@mui/icons-material';
 
-const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], suppliers = [], businessProfile }) => {
+const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], suppliers = [], businessProfile, recordAudit }) => {
     const { isAdmin } = useAuth();
     const [hubTab, setHubTab] = useState(0);
     const [reportTab, setReportTab] = useState(0);
@@ -559,7 +559,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                 const newTx = [];
                                 if (Number(supplierDetails.payable_balance) > 0) {
                                     newTx.push({
-                                        id: Date.now().toString(),
+                                        id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                                         date: new Date().toISOString().split('T')[0],
                                         type: 'Opening Balance',
                                         amount: Number(supplierDetails.payable_balance),
@@ -588,7 +588,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                 const sup = suppliers.find(s => s.id === selectedSupplierId);
                                 const newBalance = Math.max(0, Number(sup.payable_balance || 0) - Number(paymentAmount));
                                 const tx = {
-                                    id: Date.now().toString(),
+                                    id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                                     date: new Date().toISOString().split('T')[0],
                                     type: 'Payment Made',
                                     amount: Number(paymentAmount),
@@ -599,6 +599,13 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                     payable_balance: newBalance,
                                     transactions: newTransactions
                                 }).eq('id', selectedSupplierId);
+                                
+                                await recordAudit('Vendor Payment', {
+                                    supplier: sup?.name,
+                                    amount: paymentAmount,
+                                    new_balance: newBalance
+                                });
+
                                 setOpenPayVendorDialog(false);
                             }}>POST PAYMENT</Button>
                         </DialogActions>
@@ -689,12 +696,21 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                             <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'text.secondary' }}>
                                                 {log.record_id ? log.record_id.slice(0, 12) + '...' : '—'}
                                             </TableCell>
-                                            <TableCell sx={{ maxWidth: 320 }}>
-                                                <Tooltip title={log.notes || ''} placement="top">
-                                                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {log.notes || '—'}
-                                                    </Typography>
-                                                </Tooltip>
+                                            <TableCell>
+                                                <Box sx={{ maxWidth: 400 }}>
+                                                    {(() => {
+                                                        try {
+                                                            const details = JSON.parse(log.notes);
+                                                            return Object.entries(details).map(([k, v]) => (
+                                                                <Typography key={k} variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 600 }}>
+                                                                    <span style={{ textTransform: 'capitalize', color: '#1a237e' }}>{k.replace(/_/g, ' ')}:</span> {v?.toString()}
+                                                                </Typography>
+                                                            ));
+                                                        } catch (e) {
+                                                            return <Typography variant="caption">{log.notes || '—'}</Typography>;
+                                                        }
+                                                    })()}
+                                                </Box>
                                             </TableCell>
                                         </TableRow>
                                     ))}

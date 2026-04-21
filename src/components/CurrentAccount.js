@@ -110,7 +110,7 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
       type: typeLabel,
       amount: parseFloat(transactionDetails.amount),
       description: transactionDetails.description || 'Manual Entry',
-      id: Date.now().toString()
+      id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
     };
 
     const newTransactions = [...(acc.transactions || []), transactionEntry];

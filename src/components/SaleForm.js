@@ -34,7 +34,8 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
     payment_method: 'Cash', account_id: '', items: [],
     trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1,
-    discount_active: false, discount_type: 'Fixed', discount_value: ''
+    discount_active: false, discount_type: 'Fixed', discount_value: '',
+    cash_received: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newItem, setNewItem] = useState({ type: 'tire', tire_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
@@ -91,7 +92,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     if (newItem.type === 'tire' && !newItem.tire_id) return;
     if (newItem.type === 'part' && !newItem.part_id) return;
     if (newItem.type === 'service' && !newItem.service_name) return;
-    setInvoice({ ...invoice, items: [...invoice.items, { ...newItem, id: Date.now() }] });
+    setInvoice({ ...invoice, items: [...invoice.items, { ...newItem, id: `${newItem.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
     setNewItem({ type: 'tire', tire_id: '', part_id: '', service_name: '', quantity: 1, price: 0, serial_number: '', worker_id: '' });
   };
 
@@ -106,6 +107,11 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
   const calculateSubtotal = () => invoice.items.reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
   const calculateTradeInDeduction = () => invoice.trade_in_active ? Number(invoice.trade_in_value) * Number(invoice.trade_in_quantity || 1) : 0;
   const calculateTotal = () => Math.max(0, calculateSubtotal() - calculateTradeInDeduction() - calculateDiscount());
+  const calculateChange = () => {
+    const cash = parseFloat(invoice.cash_received);
+    if (!cash || isNaN(cash)) return 0;
+    return Math.max(0, cash - calculateTotal());
+  };
 
   const handleSubmit = async (e, shouldPrint = false) => {
     if (e) e.preventDefault();
@@ -132,7 +138,8 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
         payment_method: 'Cash', account_id: '', items: [],
         trade_in_active: false, trade_in_description: '', trade_in_value: 0, trade_in_quantity: 1,
-        discount_active: false, discount_type: 'Fixed', discount_value: ''
+        discount_active: false, discount_type: 'Fixed', discount_value: '',
+        cash_received: ''
       });
       if (!shouldPrint) alert("Transaction success.");
     } else { alert("Operational failure. Check stock/credit."); }
@@ -157,10 +164,10 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
           const partMatch = parts.find(p => p.name.toLowerCase().includes(code) || (p.sku || '').toLowerCase() === code);
           
           if (tireMatch) {
-            const newItem = { id: Date.now().toString(), type: 'tire', tire_id: tireMatch.id, quantity: 1, price: tireMatch.selling_price || 0, subtotal: tireMatch.selling_price || 0 };
+            const newItem = { id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, type: 'tire', tire_id: tireMatch.id, quantity: 1, price: tireMatch.selling_price || 0, subtotal: tireMatch.selling_price || 0 };
             setInvoice(prev => ({ ...prev, items: [...prev.items, newItem] }));
           } else if (partMatch) {
-            const newItem = { id: Date.now().toString(), type: 'part', part_id: partMatch.id, quantity: 1, price: partMatch.selling_price || partMatch.price || 0, subtotal: partMatch.selling_price || partMatch.price || 0 };
+            const newItem = { id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, type: 'part', part_id: partMatch.id, quantity: 1, price: partMatch.selling_price || partMatch.price || 0, subtotal: partMatch.selling_price || partMatch.price || 0 };
             setInvoice(prev => ({ ...prev, items: [...prev.items, newItem] }));
           }
         }
@@ -378,7 +385,15 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                   </Tooltip>
                 </Grid>
                 <Grid item xs={12} sm={2}>
-                  <IconButton color="primary" fullWidth onClick={handleAddItem} sx={{ bgcolor: 'primary.light', p: {xs: 1, sm: 1.5}, borderRadius: 2, width: {xs: '100%', sm: 'auto'} }}><AddIcon /></IconButton>
+                  <Button 
+                    fullWidth 
+                    variant="contained" 
+                    color="primary" 
+                    onClick={handleAddItem} 
+                    sx={{ p: {xs: 1, sm: 1.5}, borderRadius: 2 }}
+                  >
+                    <AddIcon />
+                  </Button>
                 </Grid>
               </Grid>
             </Box>
@@ -461,11 +476,11 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                             onClick={(e) => {
                               e.stopPropagation();
                               if (item.type === 'tire') {
-                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire',    tire_id: item.id, price: item.price, quantity: 1, id: Date.now() }] });
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire',    tire_id: item.id, price: item.price, quantity: 1, id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                               } else if (item.type === 'part') {
-                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'part',    part_id: item.id, price: item.price, quantity: 1, id: Date.now() }] });
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'part',    part_id: item.id, price: item.price, quantity: 1, id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                               } else {
-                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: item.name, price: 0, quantity: 1, id: Date.now() }] });
+                                setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: item.name, price: 0, quantity: 1, id: `service-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                               }
                             }}
                           >
@@ -504,7 +519,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire', tire_id: t.id, price: t.price, quantity: 1, id: Date.now() }] });
+                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire', tire_id: t.id, price: t.price, quantity: 1, id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                           }}
                         >
                           QUICK ADD
@@ -542,7 +557,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'part', part_id: p.id, price: p.price, quantity: 1, id: Date.now() }] });
+                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'part', part_id: p.id, price: p.price, quantity: 1, id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                           }}
                         >
                           QUICK ADD
@@ -567,7 +582,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                         sx={{ position: 'absolute', bottom: 4, right: 4, borderRadius: 2, fontSize: '0.6rem' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: s, price: 0, quantity: 1, id: Date.now() }] });
+                          setInvoice({ ...invoice, items: [...invoice.items, { type: 'service', service_name: s, price: 0, quantity: 1, id: `service-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
                         }}
                       >
                         ADD
@@ -592,16 +607,16 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                 <TableBody>
                   {invoice.items.map(item => (
                     <TableRow key={item.id}>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell sx={{ py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {item.type === 'tire' && tires.find(t => t.id === item.tire_id)?.images?.[0] && (
-                            <img src={tires.find(t => t.id === item.tire_id).images[0]} alt="tire" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover', aspectRatio: '1/1' }} />
+                            <img src={tires.find(t => t.id === item.tire_id).images[0]} alt="tire" style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', aspectRatio: '1/1' }} />
                           )}
                           <Box>
-                            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', lineHeight: 1.1 }}>
                               {item.type === 'tire' ? tires.find(t => t.id === item.tire_id)?.brand : item.type === 'part' ? parts.find(p => p.id === item.part_id)?.name : item.service_name}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">{item.quantity} x {Number(item.price).toLocaleString()}</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{item.quantity} x {Number(item.price).toLocaleString()}</Typography>
                           </Box>
                         </Box>
                       </TableCell>
@@ -711,10 +726,42 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                 </Box>
               )}
               <Divider sx={{ mb: 2, bgcolor: 'rgba(255,255,255,0.1)' }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4, alignItems: 'flex-end' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'flex-end' }}>
                 <Typography variant="h5" sx={{ fontWeight: 500 }}>Total</Typography>
                 <Typography variant="h3" sx={{ fontWeight: 900 }}>{calculateTotal().toLocaleString()} {currency}</Typography>
               </Box>
+
+              {invoice.payment_method === 'Cash' && (
+                <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={7}>
+                      <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', opacity: 0.8, display: 'block', mb: 0.5 }}>Amount Received</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        placeholder="0.00"
+                        value={invoice.cash_received}
+                        onChange={e => setInvoice({ ...invoice, cash_received: e.target.value })}
+                        InputProps={{
+                          sx: { 
+                            bgcolor: 'rgba(255,255,255,0.9)', 
+                            borderRadius: 1.5, 
+                            fontWeight: 900,
+                            '& input': { py: 1 }
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={5} sx={{ textAlign: 'right' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', opacity: 0.8, display: 'block', mb: 0.5 }}>Balance</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: calculateChange() > 0 ? '#a5d6a7' : '#fff' }}>
+                        {calculateChange().toLocaleString()}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
               <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <Button
@@ -855,6 +902,13 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               <div className="totals">
                 <div className="total-row"><span>{t('subtotal', 'receipt')}</span> <span>{lastSavedInvoice?.subtotal?.toLocaleString()}</span></div>
                 <div className="total-row grand-total"><span>{t('totalStr', 'receipt')} ({currency})</span> <span>{lastSavedInvoice?.total?.toLocaleString()}</span></div>
+                
+                {lastSavedInvoice?.payment_method === 'Cash' && lastSavedInvoice?.cash_received && (
+                  <div style={{ marginTop: '8px', borderTop: '0.5px dashed #000', paddingTop: '4px' }}>
+                    <div className="total-row"><span>{t('cashGiven', 'receipt') || 'CASH GIVEN'}</span> <span>{parseFloat(lastSavedInvoice.cash_received).toLocaleString()}</span></div>
+                    <div className="total-row" style={{ fontWeight: 900 }}><span>{t('balance', 'receipt') || 'BALANCE'}</span> <span>{(parseFloat(lastSavedInvoice.cash_received) - lastSavedInvoice.total).toLocaleString()}</span></div>
+                  </div>
+                )}
               </div>
 
               <div className="footer">
