@@ -375,10 +375,10 @@ const AppContent = () => {
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
       recordAudit('Process Sale', { customer: invoice.customer_name, total: invoice.total });
-      return true;
+      return { success: true, data };
     } catch (e) {
       console.error("Error processing sale: ", e);
-      return false;
+      return { success: false, error: e.message };
     }
   };
 

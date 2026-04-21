@@ -26,6 +26,39 @@ import {
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
+const ReceiptStyles = `
+  @page { size: 80mm auto; margin: 0; }
+  body { 
+    width: 72mm; 
+    margin: 4mm auto; 
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    font-size: 11px; 
+    line-height: 1.4;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+  }
+  .receipt-container { width: 100%; }
+  .receipt-container .header { text-align: center; margin-bottom: 12px; }
+  .receipt-container .logo { width: 35mm; height: auto; margin-bottom: 4px; display: block; margin: 0 auto; filter: grayscale(100%); }
+  .receipt-container .business-name { font-size: 16px; font-weight: 900; display: block; text-align: center; text-transform: uppercase; margin-bottom: 2px; }
+  .receipt-container .address { font-size: 9px; line-height: 1.2; opacity: 0.8; }
+  
+  .receipt-container .info { font-size: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; margin-bottom: 8px; margin-top: 8px; }
+  .receipt-container .total-row { display: flex; justify-content: space-between; }
+  
+  .receipt-container .table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .receipt-container .table th { text-align: left; border-bottom: 1.5px solid #000; font-size: 9px; padding: 4px 0; font-weight: 900; text-transform: uppercase; }
+  .receipt-container .table td { padding: 5px 0; vertical-align: top; border-bottom: 0.5px dashed #ccc; font-size: 10px; }
+  
+  .receipt-container .totals { border-top: 1.5px solid #000; padding-top: 4px; margin-top: 4px; }
+  .receipt-container .grand-total { font-weight: 900; font-size: 15px; border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
+  
+  .receipt-container .saving-box { background: #000; color: #fff; text-align: center; padding: 4px; margin-top: 10px; font-weight: 900; font-size: 11px; }
+  
+  .receipt-container .footer { text-align: center; font-size: 9px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; font-weight: 900; }
+  .receipt-container .dev-credit { font-size: 7px; opacity: 0.6; margin-top: 6px; text-align: center; }
+`;
+
 const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
   const { t, receiptLang, toggleReceiptLang } = useLanguage();
   console.log('SaleForm Accounts:', accounts);
@@ -128,10 +161,17 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
       discount_amount: calculateDiscount(),
       currency 
     };
-    const success = await addSale(saleData);
-    if (success) {
+    const result = await addSale(saleData);
+    if (result.success) {
       if (shouldPrint) {
-        setLastSavedInvoice(saleData);
+        // Use database ID for stable bill numbering
+        const vBillNo = result.data?.sale_id ? `INV-${result.data.sale_id.substring(0, 8).toUpperCase()}` : `INV-${Date.now().toString().slice(-4)}`;
+        setLastSavedInvoice({ 
+          ...saleData, 
+          bill_no: vBillNo,
+          timestamp: new Date().toLocaleString(),
+          cashier: masterData?.profiles?.find(p => p.id === isAdmin)?.full_name || 'Counter Service'
+        });
         setIsPrintDialogOpen(true);
       }
       setInvoice({
@@ -142,7 +182,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         cash_received: ''
       });
       if (!shouldPrint) alert("Transaction success.");
-    } else { alert("Operational failure. Check stock/credit."); }
+    } else { alert(`Operational failure: ${result.error || 'Check stock/credit.'}`); }
     setIsSubmitting(false);
   };
 
@@ -208,7 +248,10 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         discount_amount: calculateDiscount(), 
         currency, 
         is_quote: true, 
-        expires_at: expiresAt.toLocaleDateString() 
+        bill_no: `QT-${Date.now().toString().slice(-6)}`,
+        timestamp: new Date().toLocaleString(),
+        expires_at: expiresAt.toLocaleDateString(),
+        cashier: 'System Quote'
       });
       setIsPrintDialogOpen(true);
     } else { alert("Failed to save quotation."); }
@@ -221,33 +264,10 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     printWindow.document.write(`
       <html>
         <head>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            body { 
-              width: 72mm; 
-              margin: 4mm auto; 
-              font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-              font-size: 11px; 
-              line-height: 1.4;
-              color: #000;
-            }
-            .header { text-align: center; margin-bottom: 15px; }
-            .logo { width: 50mm; height: auto; margin-bottom: 8px; filter: grayscale(100%); }
-            .business-name { font-size: 16px; font-weight: 900; display: block; }
-            .info { font-size: 10px; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px; }
-            .table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            .table th { text-align: left; border-bottom: 1px solid #000; padding: 4px 0; font-size: 10px; }
-            .table td { padding: 6px 0; vertical-align: top; border-bottom: 0.5px dashed #eee; }
-            .totals { border-top: 1.5px solid #000; margin-top: 5px; padding-top: 8px; }
-            .total-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .grand-total { font-size: 15px; font-weight: 900; margin-top: 8px; padding-top: 8px; border-top: 1px solid #000; }
-            .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
-            .dev-credit { font-size: 9px; opacity: 0.6; margin-top: 10px; font-weight: bold; }
-            .qr-placeholder { margin-top: 10px; font-size: 8px; color: #666; }
-          </style>
+          <style>${ReceiptStyles}</style>
         </head>
         <body>
-          ${receiptHtml}
+          <div class="receipt-container">${receiptHtml}</div>
           <script>
             window.onload = function() {
               window.print();
@@ -755,7 +775,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                     </Grid>
                     <Grid item xs={5} sx={{ textAlign: 'right' }}>
                       <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', opacity: 0.8, display: 'block', mb: 0.5 }}>Balance</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 900, color: calculateChange() > 0 ? '#a5d6a7' : '#fff' }}>
+                      <Typography variant="h5" sx={{ fontWeight: 500, color: calculateChange() > 0 ? '#a5d6a7' : '#fff' }}>
                         {calculateChange().toLocaleString()}
                       </Typography>
                     </Grid>
@@ -811,7 +831,6 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         </Grid>
       </Grid>
 
-      {/* Hidden Receipt */}
       {/* Receipt Preview Dialog */}
       <Dialog open={isPrintDialogOpen} onClose={() => setIsPrintDialogOpen(false)} maxWidth="xs" fullWidth scroll="paper" PaperProps={{ sx: { borderRadius: 4 } }}>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
@@ -821,105 +840,115 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
             <IconButton onClick={() => setIsPrintDialogOpen(false)} size="small"><CloseIcon /></IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ bgcolor: '#f5f5f5', p: 4 }}>
-          <Box id="thermal-receipt-preview" sx={{
-            bgcolor: '#fff', p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        <DialogContent sx={{ bgcolor: '#f5f5f5', p: {xs: 1, md: 4}, overflowX: 'hidden' }}>
+          <Box id="thermal-receipt-preview" className="receipt-container" sx={{
+            bgcolor: '#fff', p: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
             width: '72mm', mx: 'auto',
-            fontFamily: 'Courier New',
-            fontSize: '11px',
-            color: '#000'
+            fontFamily: 'Inter, sans-serif',
+            color: '#000',
+            lineHeight: 1.4
           }}>
-            <style>
-              {`
-                .receipt-container .header { text-align: center; margin-bottom: 15px; }
-                .receipt-container .logo { width: 40mm; height: auto; margin-bottom: 8px; display: block; margin: 0 auto; }
-                .receipt-container .business-name { font-size: 14px; font-weight: 900; display: block; text-align: center; }
-                .receipt-container .info { font-size: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-                .receipt-container .total-row { display: flex; justify-content: space-between; }
-                .receipt-container .table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-                .receipt-container .table th { text-align: left; border-bottom: 1px solid #000; font-size: 10px; padding: 4px 0; }
-                .receipt-container .table td { padding: 4px 0; vertical-align: top; border-bottom: 0.5px dashed #eee; }
-                .receipt-container .totals { border-top: 1px solid #000; padding-top: 5px; margin-top: 5px; }
-                .receipt-container .grand-total { font-weight: 900; font-size: 13px; border-top: 1px solid #000; padding-top: 5px; margin-top: 5px; }
-                .receipt-container .footer { text-align: center; font-size: 9px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
-                .receipt-container .dev-credit { font-size: 8px; opacity: 0.8; margin-top: 8px; font-style: italic; }
-              `}
-            </style>
-            <div className="receipt-container">
-              <div className="header">
-                {businessProfile?.logo_url && <img src={businessProfile.logo_url} className="logo" alt="Logo" />}
-                <span className="business-name">{businessProfile?.name}</span>
-                <div style={{ fontSize: '10px' }}>{businessProfile?.address}</div>
-                {lastSavedInvoice?.is_quote && (
-                  <div style={{ marginTop: '8px', padding: '4px', borderTop: '2px solid #000', borderBottom: '2px solid #000', fontWeight: 900, fontSize: '14px', letterSpacing: '1px' }}>
-                    {t('quotation', 'receipt')}
-                  </div>
-                )}
-              </div>
+            <style>{ReceiptStyles}</style>
+            
+            <div className="header">
+              {businessProfile?.logo_url && <img src={businessProfile.logo_url} className="logo" alt="Logo" />}
+              <span className="business-name">{businessProfile?.name}</span>
+              <div className="address">{businessProfile?.address}</div>
+              {lastSavedInvoice?.is_quote && (
+                <div style={{ marginTop: '8px', padding: '4px', borderTop: '2px solid #000', borderBottom: '2px solid #000', fontWeight: 900, fontSize: '14px', letterSpacing: '1px', textAlign: 'center' }}>
+                  {t('quotation', 'receipt')}
+                </div>
+              )}
+            </div>
 
-              <div className="info">
-                <div className="total-row"><span>{t('date', 'receipt')}</span> <span>{lastSavedInvoice?.date}</span></div>
-                {lastSavedInvoice?.is_quote && <div className="total-row"><span>{t('validUntil', 'receipt')}</span> <span>{lastSavedInvoice?.expires_at}</span></div>}
-                <div className="total-row"><span>{t('customer', 'receipt')}</span> <span>{lastSavedInvoice?.customer_name || t('walkIn', 'receipt')}</span></div>
-                {lastSavedInvoice?.vehicle_number && <div className="total-row"><span>{t('vehicle', 'receipt')}</span> <span>{lastSavedInvoice?.vehicle_number}</span></div>}
+            <div className="info">
+              <div className="total-row">
+                <span>{t('billNo', 'receipt')} : {lastSavedInvoice?.bill_no}</span>
+                <span>{t('cashier', 'receipt')} : {lastSavedInvoice?.cashier}</span>
               </div>
+              <div className="total-row">
+                <span>{t('date', 'receipt')} : {lastSavedInvoice?.timestamp}</span>
+              </div>
+              <div className="total-row" style={{ marginTop: '4px', borderTop: '0.5px dashed #ccc', paddingTop: '4px' }}>
+                <span>{t('customer', 'receipt')} : {lastSavedInvoice?.customer_name || t('walkIn', 'receipt')}</span>
+                {lastSavedInvoice?.vehicle_number && <span> - {lastSavedInvoice?.vehicle_number}</span>}
+              </div>
+            </div>
 
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>{t('item', 'receipt')}</th>
-                    <th align="right">{t('qty', 'receipt')}</th>
-                    <th align="right">{t('sub', 'receipt')}</th>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('item', 'receipt')}</th>
+                  <th align="center">{t('qty', 'receipt')}</th>
+                  <th align="right">{t('total', 'receipt')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(lastSavedInvoice?.items || []).map(i => (
+                  <tr key={i.id}>
+                    <td>
+                      <div style={{ fontWeight: 900, textTransform: 'uppercase' }}>
+                        {i.type === 'tire' ? (tires || []).find(t => t.id === i.tire_id)?.brand : i.type === 'part' ? (parts || []).find(p => p.id === i.part_id)?.name : i.service_name}
+                      </div>
+                      <div style={{ fontSize: '8px', opacity: 0.7 }}>
+                        {i.quantity} x {Number(i.price).toLocaleString()}
+                        {i.serial_number && <span> | SN: {i.serial_number}</span>}
+                      </div>
+                    </td>
+                    <td align="center" style={{ fontWeight: 800 }}>{i.quantity}</td>
+                    <td align="right" style={{ fontWeight: 900 }}>{(i.price * i.quantity).toLocaleString()}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(lastSavedInvoice?.items || []).map(i => (
-                    <tr key={i.id}>
-                      <td>
-                        <strong>{i.type === 'tire' ? (tires || []).find(t => t.id === i.tire_id)?.brand : i.type === 'part' ? (parts || []).find(p => p.id === i.part_id)?.name : i.service_name}</strong>
-                        {i.serial_number && <div style={{ fontSize: '8px' }}>SN: {i.serial_number}</div>}
-                      </td>
-                      <td align="right">{i.quantity}</td>
-                      <td align="right">{(i.price * i.quantity).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                  {lastSavedInvoice?.trade_in_active && (
-                    <tr style={{ fontStyle: 'italic' }}>
-                      <td>{t('tradeIn', 'receipt')} {lastSavedInvoice.trade_in_description}</td>
-                      <td align="right">{lastSavedInvoice.trade_in_quantity}</td>
-                      <td align="right">-{(Number(lastSavedInvoice.trade_in_value || 0) * Number(lastSavedInvoice.trade_in_quantity || 1)).toLocaleString()}</td>
-                    </tr>
-                  )}
-                  {lastSavedInvoice?.discount_amount > 0 && (
-                    <tr style={{ fontStyle: 'italic' }}>
-                      <td colSpan="2">{t('discount', 'receipt')} {lastSavedInvoice.discount_type === 'Percentage' ? `(${lastSavedInvoice.discount_value}%)` : ''}</td>
-                      <td align="right">-{(lastSavedInvoice.discount_amount || 0).toLocaleString()}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              <div className="totals">
-                <div className="total-row"><span>{t('subtotal', 'receipt')}</span> <span>{lastSavedInvoice?.subtotal?.toLocaleString()}</span></div>
-                <div className="total-row grand-total"><span>{t('totalStr', 'receipt')} ({currency})</span> <span>{lastSavedInvoice?.total?.toLocaleString()}</span></div>
-                
-                {lastSavedInvoice?.payment_method === 'Cash' && lastSavedInvoice?.cash_received && (
-                  <div style={{ marginTop: '8px', borderTop: '0.5px dashed #000', paddingTop: '4px' }}>
-                    <div className="total-row"><span>{t('cashGiven', 'receipt') || 'CASH GIVEN'}</span> <span>{parseFloat(lastSavedInvoice.cash_received).toLocaleString()}</span></div>
-                    <div className="total-row" style={{ fontWeight: 900 }}><span>{t('balance', 'receipt') || 'BALANCE'}</span> <span>{(parseFloat(lastSavedInvoice.cash_received) - lastSavedInvoice.total).toLocaleString()}</span></div>
-                  </div>
+                ))}
+                {lastSavedInvoice?.trade_in_active && (
+                  <tr style={{ fontStyle: 'italic', background: '#f9f9f9' }}>
+                    <td>{t('tradeIn', 'receipt')} ({lastSavedInvoice.trade_in_description || 'Exchange'})</td>
+                    <td align="center">{lastSavedInvoice.trade_in_quantity}</td>
+                    <td align="right">-{(Number(lastSavedInvoice.trade_in_value || 0) * Number(lastSavedInvoice.trade_in_quantity || 1)).toLocaleString()}</td>
+                  </tr>
                 )}
-              </div>
+                {lastSavedInvoice?.discount_amount > 0 && (
+                  <tr style={{ fontStyle: 'italic', background: '#f9f9f9' }}>
+                    <td colSpan="2">{t('discount', 'receipt')} {lastSavedInvoice.discount_type === 'Percentage' ? `(${lastSavedInvoice.discount_value}%)` : ''}</td>
+                    <td align="right">-{(lastSavedInvoice.discount_amount || 0).toLocaleString()}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
 
-              <div className="footer">
-                {!lastSavedInvoice?.is_quote && <div>{t('thankYou', 'receipt')}</div>}
-                {!lastSavedInvoice?.is_quote && <div>{t('warranty', 'receipt')}</div>}
-                <div className="dev-credit">{t('poweredBy', 'receipt')}</div>
+            <div className="totals">
+              <div className="total-row" style={{ opacity: 0.8 }}>
+                 <span>{t('subtotal', 'receipt')}</span> 
+                 <span>{lastSavedInvoice?.subtotal?.toLocaleString()}</span>
               </div>
+              <div className="total-row grand-total">
+                <span>{t('totalStr', 'receipt')} ({currency})</span> 
+                <span>{lastSavedInvoice?.total?.toLocaleString()}</span>
+              </div>
+              
+              {lastSavedInvoice?.payment_method === 'Cash' && lastSavedInvoice?.cash_received && (
+                <div style={{ marginTop: '8px', borderTop: '0.5px dashed #000', paddingTop: '4px' }}>
+                  <div className="total-row"><span>{t('cashGiven', 'receipt')}</span> <span>{parseFloat(lastSavedInvoice.cash_received).toLocaleString()}</span></div>
+                  <div className="total-row" style={{ opacity: 0.8 }}><span>{t('balance', 'receipt')}</span> <span>{(parseFloat(lastSavedInvoice.cash_received) - lastSavedInvoice.total).toLocaleString()}</span></div>
+                </div>
+              )}
+            </div>
+
+            {(lastSavedInvoice?.discount_amount > 0 || lastSavedInvoice?.trade_in_active) && (
+                <div className="saving-box">
+                    {t('savings', 'receipt')} {((lastSavedInvoice?.discount_amount || 0) + (Number(lastSavedInvoice?.trade_in_value || 0) * Number(lastSavedInvoice?.trade_in_quantity || 1))).toLocaleString()} {currency}
+                </div>
+            )}
+
+            <div className="footer">
+              {!lastSavedInvoice?.is_quote && <div style={{ fontSize: '11px', marginBottom: '4px' }}>{t('thankYou', 'receipt')}</div>}
+              {!lastSavedInvoice?.is_quote && <div style={{ fontSize: '8px', fontWeight: 500 }}>{t('warranty', 'receipt')}</div>}
+              <div className="dev-credit">{t('poweredBy', 'receipt')}</div>
             </div>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, borderTop: '1px solid #eee' }}>
+
+
+        <DialogActions sx={{ p: {xs: 2, md: 3}, borderTop: '1px solid #eee' }}>
           <Button onClick={() => setIsPrintDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>Close</Button>
           <Button onClick={handleThermalPrint} variant="contained" startIcon={<PrintIcon />} sx={{ borderRadius: 2, px: 4 }}>Print Receipt</Button>
         </DialogActions>

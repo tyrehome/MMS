@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS public.sale_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sale_id UUID REFERENCES public.sales(id) ON DELETE CASCADE,
     tire_id UUID REFERENCES public.tires(id) ON DELETE SET NULL,
+    part_id UUID REFERENCES public.parts(id) ON DELETE SET NULL,
     service_name TEXT,
     quantity INTEGER,
     price NUMERIC,
@@ -215,6 +216,7 @@ ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFA
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS service_name TEXT;
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS serial_number TEXT;
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS worker_id UUID REFERENCES public.workers(id) ON DELETE SET NULL;
+ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS part_id UUID REFERENCES public.parts(id) ON DELETE SET NULL;
 
 -- Account & Sales Integration Migrations
 ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS name TEXT;
@@ -255,6 +257,7 @@ DECLARE
     new_sale_id UUID;
     item JSONB;
     v_tire_id UUID;
+    v_part_id UUID;
     v_stock INTEGER;
     v_patch_part RECORD;
     v_total_patches INTEGER := 0;
@@ -264,7 +267,7 @@ DECLARE
     v_work_done TEXT := '';
     v_trade_in_id UUID;
 BEGIN
-    -- 1. Deduct Stock for Tires
+    -- 1. Deduct Stock for Tires and Parts
     FOR item IN SELECT * FROM jsonb_array_elements(sale_payload->'items')
     LOOP
         IF (item->>'type') = 'tire' AND (item->>'tire_id') IS NOT NULL THEN
@@ -276,6 +279,16 @@ BEGIN
             UPDATE public.tires 
             SET stock = stock - (item->>'quantity')::INTEGER
             WHERE id = v_tire_id;
+            
+        ELSIF (item->>'type') = 'part' AND (item->>'part_id') IS NOT NULL THEN
+            v_part_id := (item->>'part_id')::UUID;
+            SELECT stock INTO v_stock FROM public.parts WHERE id = v_part_id FOR UPDATE;
+            IF v_stock < (item->>'quantity')::INTEGER THEN
+                RAISE EXCEPTION 'Insufficient stock for part %', v_part_id;
+            END IF;
+            UPDATE public.parts 
+            SET stock = stock - (item->>'quantity')::INTEGER
+            WHERE id = v_part_id;
         END IF;
         
         -- Count patches for later
@@ -324,10 +337,11 @@ BEGIN
     -- 4. Save Sale Items & 5. Tasks
     FOR item IN SELECT * FROM jsonb_array_elements(sale_payload->'items')
     LOOP
-        INSERT INTO public.sale_items (sale_id, tire_id, service_name, quantity, price, subtotal, serial_number, worker_id)
+        INSERT INTO public.sale_items (sale_id, tire_id, part_id, service_name, quantity, price, subtotal, serial_number, worker_id)
         VALUES (
             new_sale_id, 
             CASE WHEN (item->>'type') = 'tire' THEN (item->>'tire_id')::UUID ELSE NULL END, 
+            CASE WHEN (item->>'type') = 'part' THEN (item->>'part_id')::UUID ELSE NULL END,
             CASE WHEN (item->>'type') = 'service' THEN item->>'service_name' ELSE NULL END, 
             (item->>'quantity')::INTEGER, 
             (item->>'price')::NUMERIC, 

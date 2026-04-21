@@ -14,7 +14,7 @@ export const translations = {
     thankYou: "THANK YOU FOR YOUR BUSINESS!",
     warranty: "Warranty Claims valid with this receipt.",
     walkIn: "Walk-in",
-    poweredBy: "Powered by amsome.com",
+    poweredBy: "Powered by amsome.com 0715828422",
 
     // Dashboard & POS UI Translation (partial mapping for demo)
     posTitle: "POS & Billing Engine",
@@ -26,7 +26,14 @@ export const translations = {
     payAndPrint: "PAY & PRINT",
     generateQuote: "QUOTE",
     quotation: "QUOTATION",
-    validUntil: "VALID UNTIL:"
+    validUntil: "VALID UNTIL:",
+    billNo: "BILL NO:",
+    price: "PRICE",
+    total: "TOTAL",
+    cashGiven: "CASH GIVEN",
+    balance: "BALANCE",
+    savings: "YOU SAVED:",
+    cashier: "CASHIER:"
   },
   si: {
     receiptPreview: "බිල්පත් පෙරදසුන",
@@ -43,7 +50,7 @@ export const translations = {
     thankYou: "ඔබට ස්තූතියි!",
     warranty: "වගකීම් සඳහා මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.",
     walkIn: "සාමාන්‍ය",
-    poweredBy: "Powered by amsome.com",
+    poweredBy: "Powered by amsome.com 0715828422",
 
     posTitle: "බිල්පත් සහ විකිණීම් පුවරුව",
     posSubTitle: "වැඩි වේගයකින් යුත් වෙළඳ පුවරුව",
@@ -54,6 +61,13 @@ export const translations = {
     payAndPrint: "ගෙවා මුද්‍රණය කරන්න",
     generateQuote: "මිල ගණන් (QUOTE)",
     quotation: "මිල දර්ශකය (QUOTATION)",
-    validUntil: "වලංගු දිනය:"
+    validUntil: "වලංගු දිනය:",
+    billNo: "බිල්පත් අංකය:",
+    price: "මිල",
+    total: "එකතුව",
+    cashGiven: "ලැබුණු මුදල",
+    balance: "ඉතිරි මුදල",
+    savings: "ඔබ ලබන වාසිය:",
+    cashier: "මුදල් අයකැමි:"
   }
 };
