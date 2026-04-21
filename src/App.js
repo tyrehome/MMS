@@ -534,7 +534,19 @@ const AppContent = () => {
 
     switch (selectedComponent) {
       case "Dashboard": 
-        return isAdmin ? <Dashboard tires={tires} parts={parts} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
+        return isAdmin ? (
+          <Dashboard 
+            tires={tires} 
+            parts={parts} 
+            sales={sales} 
+            tasks={tasks} 
+            workers={workers}
+            accounts={accounts}
+            vehicles={vehicles}
+            appointments={appointments}
+            {...commonProps} 
+          />
+        ) : posComponent;
       
       case "InventoryHub": 
         return isAdmin ? (
@@ -570,7 +582,19 @@ const AppContent = () => {
         return isAdmin ? <Settings {...commonProps} /> : posComponent;
       
       default: 
-        return isAdmin ? <Dashboard tires={tires} parts={parts} sales={sales} tasks={tasks} {...commonProps} /> : posComponent;
+        return isAdmin ? (
+          <Dashboard 
+            tires={tires} 
+            parts={parts} 
+            sales={sales} 
+            tasks={tasks} 
+            workers={workers}
+            accounts={accounts}
+            vehicles={vehicles}
+            appointments={appointments}
+            {...commonProps} 
+          />
+        ) : posComponent;
     }
   };
 
