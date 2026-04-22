@@ -4,7 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, TextField, Select,
   MenuItem, FormControl, InputLabel, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, Snackbar, Tab, Tabs
+  LinearProgress, Snackbar, Tab, Tabs, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,8 +32,10 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
     vehicle_number: '',
     price: '',
     date: format(new Date(), 'yyyy-MM-dd'), 
-    time: format(new Date(), 'HH:mm') 
+    time: format(new Date(), 'HH:mm'),
+    priority: 'Standard'
   });
+  const [taskFilter, setTaskFilter] = useState('Active');
 
   useEffect(() => { setWorkers(workersList); }, [workersList]);
   useEffect(() => { setTasks(tasksList); }, [tasksList]);
@@ -155,7 +157,22 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
             })}
           </Grid>
 
-          <Card sx={{ borderRadius: 4, overflow: 'hidden' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>Mission Queue</Typography>
+            <ToggleButtonGroup
+              value={taskFilter}
+              exclusive
+              onChange={(_, v) => v && setTaskFilter(v)}
+              size="small"
+              sx={{ bgcolor: 'rgba(0,0,0,0.03)', borderRadius: 2, '& .MuiToggleButton-root': { border: 'none', px: 2, fontWeight: 700 } }}
+            >
+              <ToggleButton value="Active">Active</ToggleButton>
+              <ToggleButton value="Completed">Archive</ToggleButton>
+              <ToggleButton value="All">All</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
             <TableContainer>
               <Table>
                 <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
@@ -168,18 +185,44 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {tasks.slice(0, 10).map(task => (
+                  {tasks
+                    .filter(t => {
+                      if (taskFilter === 'Active') return t.status !== 'Completed';
+                      if (taskFilter === 'Completed') return t.status === 'Completed';
+                      return true;
+                    })
+                    .map(task => (
                     <TableRow key={task.id} hover>
-                      <TableCell sx={{ fontWeight: 800 }}>{workers.find(w => w.id === task.worker_id)?.name}</TableCell>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 700 }}>{task.customer_name || 'N/A'}</Typography>
-                        <Typography variant="caption" sx={{ opacity: 0.6 }}>{task.vehicle_number}</Typography>
+                      <TableCell sx={{ fontWeight: 800 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.main' }}>
+                            {workers.find(w => w.id === task.worker_id)?.name?.[0] || '?'}
+                          </Avatar>
+                          {workers.find(w => w.id === task.worker_id)?.name}
+                        </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography sx={{ fontWeight: 900 }}>{task.task}</Typography>
-                        <Typography variant="caption" sx={{ opacity: 0.6 }}>{task.details}</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{task.customer_name || 'Walk-in'}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.6, fontWeight: 700 }}>{task.vehicle_number}</Typography>
                       </TableCell>
-                      <TableCell><Chip label={task.status} size="small" color={task.status === 'Completed' ? 'success' : 'primary'} sx={{ fontWeight: 900, borderRadius: 2 }} /></TableCell>
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{task.task}</Typography>
+                        <Typography variant="caption" sx={{ display: 'block', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {task.details || 'No additional notes'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                           Started: {task.time}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={task.status} 
+                          size="small" 
+                          color={task.status === 'Completed' ? 'success' : 'primary'} 
+                          sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.65rem' }} 
+                        />
+                        {task.priority === 'High' && <Chip label="Urgent" size="small" color="error" sx={{ ml: 1, height: 20, fontSize: '0.6rem', fontWeight: 900 }} />}
+                      </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                           {task.status !== 'Completed' && (
@@ -190,18 +233,25 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                           {task.status === 'Completed' && (
                             <Button 
                               size="small" 
-                              variant="outlined" 
+                              variant="contained" 
                               color="secondary" 
                               onClick={() => handleBillTask(task)}
-                              sx={{ fontWeight: 900, borderRadius: 2 }}
+                              sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.7rem' }}
                             >
-                              BILL
+                              GENERATE BILL
                             </Button>
                           )}
                         </Box>
                       </TableCell>
                     </TableRow>
                   ))}
+                  {tasks.filter(t => taskFilter === 'All' || (taskFilter === 'Active' ? t.status !== 'Completed' : t.status === 'Completed')).length === 0 && (
+                     <TableRow>
+                       <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
+                         No {taskFilter.toLowerCase()} missions in the queue.
+                       </TableCell>
+                     </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -234,6 +284,13 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
             <TextField fullWidth sx={{ mt: 1 }} label="Customer Name" value={taskFormData.customer_name} onChange={e => setTaskFormData({...taskFormData, customer_name: e.target.value})} />
             <TextField fullWidth sx={{ mt: 1 }} label="Vehicle Number" value={taskFormData.vehicle_number} onChange={e => setTaskFormData({...taskFormData, vehicle_number: e.target.value})} />
             <TextField fullWidth sx={{ mt: 1 }} type="number" label="Estimated Price (LKR)" value={taskFormData.price} onChange={e => setTaskFormData({...taskFormData, price: e.target.value})} />
+            <FormControl fullWidth sx={{ mt: 1 }} variant="outlined">
+                <InputLabel>Priority Level</InputLabel>
+                <Select label="Priority Level" value={taskFormData.priority} onChange={e => setTaskFormData({...taskFormData, priority: e.target.value})}>
+                    <MenuItem value="Standard">Standard Priority</MenuItem>
+                    <MenuItem value="High">🚨 High Priority (Express)</MenuItem>
+                </Select>
+            </FormControl>
             <TextField fullWidth sx={{ mt: 1 }} multiline rows={3} label="Technical Details" value={taskFormData.details} onChange={e => setTaskFormData({...taskFormData, details: e.target.value})} />
             <Button variant="contained" fullWidth size="large" onClick={handleTaskSubmit} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>AUTHORIZE DEPLOYMENT</Button>
         </DialogContent>

@@ -655,59 +655,100 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                 <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>System Audit Trail</Typography>
-                        <Button startIcon={<RefreshIcon />} onClick={fetchAuditLogs} variant="outlined" sx={{ borderRadius: 3 }}>
-                            {loadingAudit ? 'Loading...' : 'Refresh'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                            <TextField 
+                                size="small" 
+                                placeholder="Search actions or notes..." 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18 }} /></InputAdornment>,
+                                    sx: { borderRadius: 3, width: 300 }
+                                }}
+                            />
+                            <Button startIcon={<RefreshIcon />} onClick={fetchAuditLogs} variant="outlined" sx={{ borderRadius: 3 }}>
+                                {loadingAudit ? 'Loading...' : 'Refresh'}
+                            </Button>
+                        </Box>
                     </Box>
                     <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
                         <TableContainer>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 900, py: 2.5 }}>DATE & TIME</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>ACTION</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>TABLE</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>RECORD ID</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>NOTES</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, py: 2.5, width: 220 }}>DATE & TIME</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, width: 200 }}>ACTION</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, width: 120 }}>ENTITY</TableCell>
+                                        <TableCell sx={{ fontWeight: 900 }}>TRANSACTION DETAILS</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {auditLogs.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
-                                                {loadingAudit ? 'Loading audit logs...' : 'No audit events yet. Complete a sale to generate the first entry.'}
+                                            <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
+                                                {loadingAudit ? 'Loading audit logs...' : 'No audit events found.'}
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {auditLogs.map(log => (
+                                    {auditLogs
+                                        .filter(log => {
+                                            const search = searchTerm.toLowerCase();
+                                            return !searchTerm || 
+                                                log.action?.toLowerCase().includes(search) || 
+                                                log.notes?.toLowerCase().includes(search) ||
+                                                log.table_name?.toLowerCase().includes(search);
+                                        })
+                                        .map(log => (
                                         <TableRow key={log.id} hover>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', color: 'text.secondary' }}>
-                                                {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                                            <TableCell sx={{ verticalAlign: 'top', py: 2.5 }}>
+                                                <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>
+                                                    {log.created_at ? new Date(log.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                                                    {log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell sx={{ verticalAlign: 'top' }}>
                                                 <Chip
-                                                    label={log.action}
+                                                    label={log.action.replace(/_/g, ' ')}
                                                     size="small"
-                                                    color={log.action === 'sale_processed' ? 'primary' : 'default'}
-                                                    sx={{ fontWeight: 800, borderRadius: 2, textTransform: 'uppercase', fontSize: '0.7rem' }}
+                                                    color={
+                                                        log.action.includes('sale') ? 'primary' : 
+                                                        log.action.includes('payment') ? 'success' :
+                                                        log.action.includes('return') ? 'warning' : 'default'
+                                                    }
+                                                    sx={{ fontWeight: 900, borderRadius: 2, textTransform: 'uppercase', fontSize: '0.65rem' }}
                                                 />
+                                                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontFamily: 'monospace', color: 'text.disabled' }}>
+                                                    ID: {log.record_id?.slice(0, 8)}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.85rem' }}>{log.table_name || '—'}</TableCell>
-                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'text.secondary' }}>
-                                                {log.record_id ? log.record_id.slice(0, 12) + '...' : '—'}
+                                            <TableCell sx={{ verticalAlign: 'top' }}>
+                                                <Typography sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                    {log.table_name || 'System'}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell>
-                                                <Box sx={{ maxWidth: 400 }}>
+                                            <TableCell sx={{ py: 2 }}>
+                                                <Box sx={{ 
+                                                    p: 1.5, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, 
+                                                    borderLeft: '3px solid', borderColor: 'primary.main',
+                                                    display: 'flex', flexWrap: 'wrap', gap: 2
+                                                }}>
                                                     {(() => {
                                                         try {
-                                                            const details = JSON.parse(log.notes);
+                                                            const details = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
                                                             return Object.entries(details).map(([k, v]) => (
-                                                                <Typography key={k} variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 600 }}>
-                                                                    <span style={{ textTransform: 'capitalize', color: '#1a237e' }}>{k.replace(/_/g, ' ')}:</span> {v?.toString()}
-                                                                </Typography>
+                                                                <Box key={k}>
+                                                                    <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
+                                                                        {k.replace(/_/g, ' ')}
+                                                                    </Typography>
+                                                                    <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+                                                                        {typeof v === 'object' ? JSON.stringify(v) : v?.toString()}
+                                                                    </Typography>
+                                                                </Box>
                                                             ));
                                                         } catch (e) {
-                                                            return <Typography variant="caption">{log.notes || '—'}</Typography>;
+                                                            return <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.notes || '—'}</Typography>;
                                                         }
                                                     })()}
                                                 </Box>
