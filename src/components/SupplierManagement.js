@@ -74,8 +74,41 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
     setOpenDetailsDialog(true);
     try {
       if (transaction.type === 'Bulk GRN') {
-        const grnRef = transaction.description.split('Ref: ')[1];
-        if (!grnRef) throw new Error("No GRN Reference found.");
+        let grnRef = transaction.description.split('Ref: ')[1]?.trim();
+        let actualGrnId = grnRef;
+
+        if (!actualGrnId) {
+          const { data: fallback } = await supabase
+            .from('grns')
+            .select('id, reference_number')
+            .eq('supplier_id', selectedSupplier.id)
+            .eq('total_cost', transaction.amount)
+            .limit(1)
+            .maybeSingle();
+          
+          if (fallback) {
+            actualGrnId = fallback.id;
+            grnRef = fallback.reference_number || fallback.id;
+          } else {
+            throw new Error("No GRN Reference found for this transaction.");
+          }
+        } else {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actualGrnId);
+          if (!isUUID) {
+            const { data: grnData } = await supabase
+              .from('grns')
+              .select('id')
+              .eq('reference_number', actualGrnId)
+              .limit(1)
+              .maybeSingle();
+            
+            if (grnData) {
+              actualGrnId = grnData.id;
+            } else {
+              throw new Error("Could not find GRN matching reference: " + actualGrnId);
+            }
+          }
+        }
         
         const { data, error } = await supabase
           .from('grn_items')
@@ -84,7 +117,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
             tires(brand, size),
             parts(name)
           `)
-          .eq('grn_id', grnRef);
+          .eq('grn_id', actualGrnId);
         if (error) throw error;
         setDetailsData({ type: 'GRN', items: data, ref: grnRef });
       } else if (transaction.type === 'Stock Return') {

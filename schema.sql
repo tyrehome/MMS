@@ -267,7 +267,7 @@ DECLARE
     v_work_done TEXT := '';
     v_trade_in_id UUID;
 BEGIN
-    -- 1. Deduct Stock for Tires and Parts
+    -- 1. Deduct Stock for Tires (FIFO from inventory_lots) and Parts
     FOR item IN SELECT * FROM jsonb_array_elements(sale_payload->'items')
     LOOP
         IF (item->>'type') = 'tire' AND (item->>'tire_id') IS NOT NULL THEN
@@ -276,21 +276,50 @@ BEGIN
             IF v_stock < (item->>'quantity')::INTEGER THEN
                 RAISE EXCEPTION 'Insufficient stock for tire %', v_tire_id;
             END IF;
-            UPDATE public.tires 
+
+            -- FIFO: deduct from oldest lots first
+            DECLARE
+                v_remaining INTEGER := (item->>'quantity')::INTEGER;
+                v_lot       RECORD;
+            BEGIN
+                FOR v_lot IN
+                    SELECT id, current_qty
+                    FROM public.inventory_lots
+                    WHERE tire_id = v_tire_id AND current_qty > 0
+                    ORDER BY
+                        CASE WHEN manufacture_date IS NOT NULL THEN manufacture_date ELSE received_at::DATE END ASC,
+                        received_at ASC
+                    FOR UPDATE
+                LOOP
+                    EXIT WHEN v_remaining <= 0;
+                    IF v_lot.current_qty >= v_remaining THEN
+                        UPDATE public.inventory_lots
+                        SET current_qty = current_qty - v_remaining
+                        WHERE id = v_lot.id;
+                        v_remaining := 0;
+                    ELSE
+                        v_remaining := v_remaining - v_lot.current_qty;
+                        UPDATE public.inventory_lots SET current_qty = 0 WHERE id = v_lot.id;
+                    END IF;
+                END LOOP;
+            END;
+
+            -- Keep master stock count in sync
+            UPDATE public.tires
             SET stock = stock - (item->>'quantity')::INTEGER
             WHERE id = v_tire_id;
-            
+
         ELSIF (item->>'type') = 'part' AND (item->>'part_id') IS NOT NULL THEN
             v_part_id := (item->>'part_id')::UUID;
             SELECT stock INTO v_stock FROM public.parts WHERE id = v_part_id FOR UPDATE;
             IF v_stock < (item->>'quantity')::INTEGER THEN
                 RAISE EXCEPTION 'Insufficient stock for part %', v_part_id;
             END IF;
-            UPDATE public.parts 
+            UPDATE public.parts
             SET stock = stock - (item->>'quantity')::INTEGER
             WHERE id = v_part_id;
         END IF;
-        
+
         -- Count patches for later
         IF (item->>'type') = 'service' AND (item->>'service_name') ILIKE '%patch%' THEN
             v_total_patches := v_total_patches + COALESCE((item->>'quantity')::INTEGER, 1);
@@ -472,8 +501,90 @@ CREATE TABLE IF NOT EXISTS public.grn_items (
     part_id UUID REFERENCES public.parts(id) ON DELETE SET NULL,
     quantity INTEGER,
     cost_price NUMERIC,
-    subtotal NUMERIC
+    subtotal NUMERIC,
+    manufacture_date DATE,
+    dot_code TEXT
 );
+
+-- ==========================================
+-- INVENTORY LOTS (FIFO Batch Tracking)
+-- Each GRN creates a separate lot per tire so
+-- the system always knows which stock is oldest.
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.inventory_lots (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tire_id          UUID REFERENCES public.tires(id) ON DELETE CASCADE,
+    grn_id           UUID REFERENCES public.grns(id) ON DELETE SET NULL,
+    initial_qty      INTEGER NOT NULL DEFAULT 0,
+    current_qty      INTEGER NOT NULL DEFAULT 0,
+    cost_price       NUMERIC DEFAULT 0,
+    dot_code         TEXT,
+    manufacture_date DATE,
+    received_at      TIMESTAMPTZ DEFAULT NOW(),
+    created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lots_tire    ON public.inventory_lots(tire_id);
+CREATE INDEX IF NOT EXISTS idx_lots_age     ON public.inventory_lots(manufacture_date ASC);
+CREATE INDEX IF NOT EXISTS idx_lots_qty     ON public.inventory_lots(current_qty);
+
+-- ==========================================
+-- DOT CODE PARSER
+-- Converts WWYY format (e.g. '1224') to a DATE.
+-- Week 12 of 2024 -> 2024-03-18
+-- ==========================================
+CREATE OR REPLACE FUNCTION parse_dot_to_date(p_dot TEXT)
+RETURNS DATE
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+    v_week INTEGER;
+    v_year INTEGER;
+BEGIN
+    IF p_dot IS NULL OR length(trim(p_dot)) < 4 THEN RETURN NULL; END IF;
+    v_week := SUBSTRING(trim(p_dot) FROM 1 FOR 2)::INTEGER;
+    v_year := SUBSTRING(trim(p_dot) FROM 3 FOR 2)::INTEGER;
+    v_year := CASE WHEN v_year < 50 THEN 2000 + v_year ELSE 1900 + v_year END;
+    IF v_week < 1 OR v_week > 53 THEN RETURN NULL; END IF;
+    RETURN (make_date(v_year, 1, 1) + ((v_week - 1) * 7))::DATE;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$;
+
+-- ==========================================
+-- STOCK AGING VIEW
+-- Powers the FIFO age dashboard in the UI.
+-- ==========================================
+CREATE OR REPLACE VIEW public.v_stock_aging AS
+SELECT
+    t.id                                                    AS tire_id,
+    t.brand,
+    t.model,
+    t.size,
+    t.tire_category,
+    l.id                                                    AS lot_id,
+    l.dot_code,
+    l.manufacture_date,
+    l.received_at,
+    l.current_qty,
+    l.initial_qty,
+    l.cost_price,
+    ROUND(
+        EXTRACT(EPOCH FROM (NOW() - l.manufacture_date)) / 86400.0 / 365.25
+    , 1)                                                    AS age_years,
+    CASE
+        WHEN l.manufacture_date IS NULL                             THEN 'Unknown'
+        WHEN NOW() - l.manufacture_date > INTERVAL '5 years'       THEN 'Expired'
+        WHEN NOW() - l.manufacture_date > INTERVAL '4 years'       THEN 'Critical'
+        WHEN NOW() - l.manufacture_date > INTERVAL '3 years'       THEN 'Expiring Soon'
+        ELSE 'Healthy'
+    END                                                     AS age_status
+FROM public.inventory_lots l
+JOIN public.tires t ON t.id = l.tire_id
+WHERE l.current_qty > 0
+ORDER BY l.manufacture_date ASC NULLS LAST;
 
 -- Supplier Returns
 CREATE TABLE IF NOT EXISTS public.supplier_returns (
@@ -544,6 +655,7 @@ ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supplier_returns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shop_talk ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_lots ENABLE ROW LEVEL SECURITY;
 
 -- Note: In a production Supabase environment, you would define specific policies.
 -- For now, we enable full access to all authenticated users.
@@ -642,24 +754,26 @@ CREATE TABLE IF NOT EXISTS public.supplier_payments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RPC for Bulk GRN Processing
+-- RPC for Bulk GRN Processing (with FIFO lot creation)
 -- Handles multiple tires and parts in a single transaction
 CREATE OR REPLACE FUNCTION process_bulk_grn(
     p_supplier_id UUID,
     p_reference_number TEXT,
     p_notes TEXT,
-    p_items JSONB -- Array of { type: 'tire'|'part', brand, model, size, name, category, quantity, cost_price, price, ... }
+    p_items JSONB
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_grn_id UUID;
-    v_item JSONB;
-    v_total_cost NUMERIC := 0;
+    v_grn_id         UUID;
+    v_item           JSONB;
+    v_total_cost     NUMERIC := 0;
     v_current_item_id UUID;
-    v_existing RECORD;
+    v_existing       RECORD;
+    v_manuf_date     DATE;
+    v_dot            TEXT;
 BEGIN
     -- 1. Create the GRN Header
     INSERT INTO public.grns (supplier_id, reference_number, notes, received_date)
@@ -670,11 +784,19 @@ BEGIN
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
         v_total_cost := v_total_cost + ((v_item->>'quantity')::INTEGER * (v_item->>'cost_price')::NUMERIC);
+        v_dot        := v_item->>'dot_code';
+
+        -- Parse manufacture date: prefer explicit manufacture_date field, fallback to DOT code
+        v_manuf_date := CASE
+            WHEN (v_item->>'manufacture_date') IS NOT NULL AND (v_item->>'manufacture_date') <> ''
+                THEN (v_item->>'manufacture_date')::DATE
+            ELSE parse_dot_to_date(v_dot)
+        END;
 
         IF (v_item->>'type') = 'tire' THEN
-            -- Check if tire exists
-            SELECT * INTO v_existing FROM public.tires 
-            WHERE LOWER(brand) = LOWER(v_item->>'brand') 
+            -- Check if tire already exists
+            SELECT * INTO v_existing FROM public.tires
+            WHERE LOWER(brand) = LOWER(v_item->>'brand')
               AND LOWER(COALESCE(model, '')) = LOWER(COALESCE(v_item->>'model', ''))
               AND LOWER(size) = LOWER(v_item->>'size')
               AND LOWER(COALESCE(tire_category, '')) = LOWER(COALESCE(v_item->>'tire_category', ''))
@@ -683,54 +805,83 @@ BEGIN
             IF FOUND THEN
                 v_current_item_id := v_existing.id;
                 UPDATE public.tires SET
-                    stock = stock + (v_item->>'quantity')::INTEGER,
-                    cost_price = (v_item->>'cost_price')::NUMERIC,
-                    price = (v_item->>'price')::NUMERIC,
-                    dot_code = COALESCE(v_item->>'dot_code', dot_code),
-                    origin = COALESCE(v_item->>'origin', origin),
-                    thread_pattern = COALESCE(v_item->>'thread_pattern', thread_pattern),
-                    images = COALESCE(ARRAY(SELECT jsonb_array_elements_text(v_item->'images')), images)
+                    stock         = stock + (v_item->>'quantity')::INTEGER,
+                    cost_price    = (v_item->>'cost_price')::NUMERIC,
+                    price         = (v_item->>'price')::NUMERIC,
+                    dot_code      = COALESCE(v_dot, dot_code),
+                    origin        = COALESCE(v_item->>'origin', origin),
+                    thread_pattern= COALESCE(v_item->>'thread_pattern', thread_pattern),
+                    images        = COALESCE(ARRAY(SELECT jsonb_array_elements_text(v_item->'images')), images)
                 WHERE id = v_current_item_id;
             ELSE
-                INSERT INTO public.tires (brand, model, size, tire_category, vehicle_type, stock, cost_price, price, dot_code, origin, thread_pattern, images, supplier_id)
+                INSERT INTO public.tires
+                    (brand, model, size, tire_category, vehicle_type, stock, cost_price, price,
+                     dot_code, origin, thread_pattern, images, supplier_id)
                 VALUES (
-                    v_item->>'brand', v_item->>'model', v_item->>'size', 
+                    v_item->>'brand', v_item->>'model', v_item->>'size',
                     v_item->>'tire_category', v_item->>'vehicle_type',
-                    (v_item->>'quantity')::INTEGER, (v_item->>'cost_price')::NUMERIC, (v_item->>'price')::NUMERIC,
-                    v_item->>'dot_code', v_item->>'origin', v_item->>'thread_pattern', 
-                    ARRAY(SELECT jsonb_array_elements_text(v_item->'images')), 
+                    (v_item->>'quantity')::INTEGER,
+                    (v_item->>'cost_price')::NUMERIC,
+                    (v_item->>'price')::NUMERIC,
+                    v_dot, v_item->>'origin', v_item->>'thread_pattern',
+                    ARRAY(SELECT jsonb_array_elements_text(v_item->'images')),
                     p_supplier_id
                 ) RETURNING id INTO v_current_item_id;
             END IF;
 
-            INSERT INTO public.grn_items (grn_id, tire_id, quantity, cost_price, subtotal)
-            VALUES (v_grn_id, v_current_item_id, (v_item->>'quantity')::INTEGER, (v_item->>'cost_price')::NUMERIC, ((v_item->>'quantity')::INTEGER * (v_item->>'cost_price')::NUMERIC));
+            -- GRN line item
+            INSERT INTO public.grn_items
+                (grn_id, tire_id, quantity, cost_price, subtotal, dot_code, manufacture_date)
+            VALUES (
+                v_grn_id, v_current_item_id,
+                (v_item->>'quantity')::INTEGER,
+                (v_item->>'cost_price')::NUMERIC,
+                ((v_item->>'quantity')::INTEGER * (v_item->>'cost_price')::NUMERIC),
+                v_dot, v_manuf_date
+            );
+
+            -- === FIFO LOT: one row per batch received ===
+            INSERT INTO public.inventory_lots
+                (tire_id, grn_id, initial_qty, current_qty, cost_price, dot_code, manufacture_date, received_at)
+            VALUES (
+                v_current_item_id, v_grn_id,
+                (v_item->>'quantity')::INTEGER,
+                (v_item->>'quantity')::INTEGER,
+                (v_item->>'cost_price')::NUMERIC,
+                v_dot, v_manuf_date, NOW()
+            );
 
         ELSIF (v_item->>'type') = 'part' THEN
-            -- Check if part exists
-            SELECT * INTO v_existing FROM public.parts 
-            WHERE LOWER(name) = LOWER(v_item->>'name') 
+            SELECT * INTO v_existing FROM public.parts
+            WHERE LOWER(name) = LOWER(v_item->>'name')
               AND LOWER(COALESCE(category, '')) = LOWER(COALESCE(v_item->>'category', ''))
             LIMIT 1 FOR UPDATE;
 
             IF FOUND THEN
                 v_current_item_id := v_existing.id;
                 UPDATE public.parts SET
-                    stock = stock + (v_item->>'quantity')::INTEGER,
+                    stock      = stock + (v_item->>'quantity')::INTEGER,
                     cost_price = (v_item->>'cost_price')::NUMERIC,
-                    price = (v_item->>'price')::NUMERIC
+                    price      = (v_item->>'price')::NUMERIC
                 WHERE id = v_current_item_id;
             ELSE
                 INSERT INTO public.parts (name, category, stock, cost_price, price, supplier_id)
                 VALUES (
                     v_item->>'name', v_item->>'category',
-                    (v_item->>'quantity')::INTEGER, (v_item->>'cost_price')::NUMERIC, (v_item->>'price')::NUMERIC,
+                    (v_item->>'quantity')::INTEGER,
+                    (v_item->>'cost_price')::NUMERIC,
+                    (v_item->>'price')::NUMERIC,
                     p_supplier_id
                 ) RETURNING id INTO v_current_item_id;
             END IF;
 
             INSERT INTO public.grn_items (grn_id, part_id, quantity, cost_price, subtotal)
-            VALUES (v_grn_id, v_current_item_id, (v_item->>'quantity')::INTEGER, (v_item->>'cost_price')::NUMERIC, ((v_item->>'quantity')::INTEGER * (v_item->>'cost_price')::NUMERIC));
+            VALUES (
+                v_grn_id, v_current_item_id,
+                (v_item->>'quantity')::INTEGER,
+                (v_item->>'cost_price')::NUMERIC,
+                ((v_item->>'quantity')::INTEGER * (v_item->>'cost_price')::NUMERIC)
+            );
         END IF;
     END LOOP;
 
@@ -738,14 +889,14 @@ BEGIN
     UPDATE public.grns SET total_cost = v_total_cost WHERE id = v_grn_id;
 
     -- 4. Update Supplier Balance
-    UPDATE public.suppliers 
+    UPDATE public.suppliers
     SET payable_balance = COALESCE(payable_balance, 0) + v_total_cost,
-        transactions = COALESCE(transactions, '[]'::jsonb) || jsonb_build_array(
+        transactions    = COALESCE(transactions, '[]'::jsonb) || jsonb_build_array(
             jsonb_build_object(
-                'id', extract(epoch from now())::text,
-                'date', to_char(now(), 'YYYY-MM-DD'),
-                'type', 'Bulk GRN',
-                'amount', v_total_cost,
+                'id',          extract(epoch from now())::text,
+                'date',        to_char(now(), 'YYYY-MM-DD'),
+                'type',        'Bulk GRN',
+                'amount',      v_total_cost,
                 'description', 'Bulk GRN Ref: ' || COALESCE(p_reference_number, v_grn_id::text)
             )
         )

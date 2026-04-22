@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import {
   TextField, Typography, Snackbar, Button, Box, Grid, Select,
   MenuItem, FormControl, InputLabel, Table, TableBody, TableCell,
@@ -18,7 +19,6 @@ import {
   ContentCopy as CopyIcon, Close as CloseIcon, AssignmentReturn as ReturnIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
-import { supabase } from '../supabaseClient';
 import PartsInventory from './PartsInventory';
 import TireHotel from './TireHotel';
 
@@ -60,11 +60,20 @@ const TireList = ({
   const [poNotes,        setPoNotes]        = useState('');
   const [poSupplier,     setPoSupplier]     = useState('');
 
+  /* ── Lot aging data from DB ── */
+  const [lotAging, setLotAging] = useState([]); // from v_stock_aging view
+
+  useEffect(() => {
+    supabase.from('v_stock_aging').select('*').then(({ data }) => {
+      if (data) setLotAging(data);
+    });
+  }, [tires]);
+
   /* ── Tire GRN state ── */
   const [grnData, setGrnData] = useState({
     brand:'',model:'',size:'',tire_category:'New',
     stock:'',cost_price:'',price:'',vehicle_type:'',
-    dot_code:'',origin:'',thread_pattern:'',
+    dot_code:'',manufacture_date:'',origin:'',thread_pattern:'',
     supplier_id: ''
   });
   const [selectedFile, setSelectedFile] = useState(null);
@@ -97,6 +106,45 @@ const TireList = ({
   const vehicleTypes = masterData?.vehicles || [];
   const currency     = businessProfile?.currency || 'LKR';
 
+  /* ── DOT Code live parser ── */
+  const parseDotCode = (dot) => {
+    if (!dot || dot.trim().length < 4) return null;
+    const clean = dot.trim().replace(/[^0-9]/g, '');
+    if (clean.length < 4) return null;
+    const week = parseInt(clean.substring(0, 2));
+    const yr2  = parseInt(clean.substring(2, 4));
+    if (week < 1 || week > 53) return null;
+    const year = yr2 < 50 ? 2000 + yr2 : 1900 + yr2;
+    const d = new Date(year, 0, 1);
+    d.setDate(d.getDate() + (week - 1) * 7);
+    return d;
+  };
+
+  const dotPreview = parseDotCode(grnData.dot_code);
+  const dotAgeYears = dotPreview
+    ? ((Date.now() - dotPreview.getTime()) / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1)
+    : null;
+
+  /* ── Age helpers for inventory table ── */
+  const getOldestLotForTire = (tireId) => {
+    const lots = lotAging.filter(l => l.tire_id === tireId);
+    if (!lots.length) return null;
+    return lots.reduce((oldest, l) => {
+      if (!oldest) return l;
+      if (!l.manufacture_date) return oldest;
+      if (!oldest.manufacture_date) return l;
+      return new Date(l.manufacture_date) < new Date(oldest.manufacture_date) ? l : oldest;
+    }, null);
+  };
+
+  const ageStatusColor = (status) => {
+    if (status === 'Expired')      return { bg: '#ffebee', color: '#c62828', icon: '🔴' };
+    if (status === 'Critical')     return { bg: '#fff3e0', color: '#e65100', icon: '🟠' };
+    if (status === 'Expiring Soon') return { bg: '#fffde7', color: '#f57f17', icon: '🟡' };
+    if (status === 'Healthy')      return null;
+    return { bg: '#f5f5f5', color: '#757575', icon: '⚪' };
+  };
+
   /* ─── image compression ─── */
   const compressImage = (file) => new Promise((resolve) => {
     const reader = new FileReader();
@@ -124,11 +172,17 @@ const TireList = ({
       setAlert({ open:true, message:'Complete all required fields.', severity:'error' }); return;
     }
     
-    // Instead of submitting, add to Bulk GRN Cart
+    // Resolve manufacture date: prefer manual date, else derive from DOT
+    let resolvedMfgDate = grnData.manufacture_date || '';
+    if (!resolvedMfgDate && grnData.dot_code) {
+      const parsed = parseDotCode(grnData.dot_code);
+      if (parsed) resolvedMfgDate = parsed.toISOString().split('T')[0];
+    }
+
     const newItem = {
       ...grnData,
       type: 'tire',
-      id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
+      id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       quantity: parseInt(grnData.stock),
       cost_price: parseFloat(grnData.cost_price || 0),
       price: parseFloat(grnData.price || 0),
@@ -136,16 +190,17 @@ const TireList = ({
       images: grnData.images || [],
       thread_pattern: grnData.thread_pattern || '',
       origin: grnData.origin || '',
-      dot_code: grnData.dot_code || ''
+      dot_code: grnData.dot_code || '',
+      manufacture_date: resolvedMfgDate,
     };
 
     setGrnItems(prev => [...prev, newItem]);
-    setAlert({ open: true, message: 'Added to GRN list', severity: 'success' });
-    setGrnData({ 
+    setAlert({ open: true, message: `✅ Added to GRN list${resolvedMfgDate ? ` (Mfg: ${resolvedMfgDate})` : ''}`, severity: 'success' });
+    setGrnData({
       brand:'', model:'', size:'', tire_category:'New',
       stock:'', cost_price:'', price:'', vehicle_type:'',
-      dot_code:'', origin:'', thread_pattern:'', 
-      supplier_id: grnData.supplier_id // Keep supplier same for convenience
+      dot_code:'', manufacture_date:'', origin:'', thread_pattern:'',
+      supplier_id: grnData.supplier_id
     });
   };
 
@@ -247,8 +302,8 @@ const TireList = ({
   const allInventory = useMemo(() => {
     const tireRows = tires.map(t => ({
       id: t.id, type: 'tire',
-      name:  `${t.brand}${t.model ? ' '+t.model : ''}`,
-      label: `${t.size}${t.vehicle_type ? ' · '+t.vehicle_type : ''}`,
+      name:  `${t.brand} ${t.model || ''} ${t.size}`.replace(/\s+/g, ' ').trim(),
+      label: `${t.vehicle_type ? t.vehicle_type : ''}`.trim(),
       category: t.tire_category || 'New',
       stock: parseInt(t.stock || 0),
       price: parseFloat(t.price || 0),
@@ -590,6 +645,7 @@ const TireList = ({
                     <TableCell sx={{ fontWeight:900, py:2.5 }}>ITEM</TableCell>
                     <TableCell sx={{ fontWeight:900 }}>TYPE / CAT</TableCell>
                     <TableCell sx={{ fontWeight:900 }}>STOCK STATUS</TableCell>
+                    <TableCell sx={{ fontWeight:900 }}>OLDEST BATCH AGE</TableCell>
                     {isAdmin && <TableCell align="right" sx={{ fontWeight:900 }}>SELL PRICE</TableCell>}
                     {isAdmin && <TableCell align="right" sx={{ fontWeight:900 }}>MARGIN</TableCell>}
                     <TableCell align="center" sx={{ fontWeight:900 }}>ORDER</TableCell>
@@ -670,6 +726,41 @@ const TireList = ({
                               )}
                             </Box>
                           </Box>
+                        </TableCell>
+
+                        {/* ── Oldest Batch Age Badge ── */}
+                        <TableCell>
+                          {item.type === 'tire' ? (() => {
+                            const lot = getOldestLotForTire(item.id);
+                            if (!lot) return <Typography variant="caption" color="text.disabled">No batches</Typography>;
+                            const style = ageStatusColor(lot.age_status);
+                            if (!style) return (
+                              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled' }}>
+                                Fresh Stock ({lot.current_qty})
+                              </Typography>
+                            );
+                            return (
+                              <Tooltip title={`DOT: ${lot.dot_code || '—'} · Received: ${lot.received_at ? new Date(lot.received_at).toLocaleDateString() : '—'} · ${lot.current_qty} units`}>
+                                <Box sx={{ display:'inline-flex', flexDirection:'column', gap:0.3 }}>
+                                  <Chip
+                                    label={`${style.icon} ${lot.age_status}`}
+                                    size="small"
+                                    sx={{ fontWeight:900, fontSize:'0.65rem', bgcolor: style.bg, color: style.color, border:`1px solid ${style.color}22` }}
+                                  />
+                                  {lot.age_years !== null && (
+                                    <Typography variant="caption" sx={{ fontSize:'0.65rem', color: style.color, fontWeight:700 }}>
+                                      {lot.age_years} yrs · {lot.current_qty} units
+                                    </Typography>
+                                  )}
+                                  {lot.manufacture_date && (
+                                    <Typography variant="caption" sx={{ fontSize:'0.6rem', color:'text.secondary' }}>
+                                      Mfg: {new Date(lot.manufacture_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Tooltip>
+                            );
+                          })() : <Typography variant="caption" color="text.disabled">—</Typography>}
                         </TableCell>
 
                         {isAdmin && (
@@ -843,7 +934,31 @@ const TireList = ({
                         <TextField fullWidth label="Country of Origin" value={grnData.origin} onChange={e=>setGrnData({...grnData,origin:e.target.value})} placeholder="e.g. Japan" />
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField fullWidth label="DOT Code" value={grnData.dot_code} onChange={e=>setGrnData({...grnData,dot_code:e.target.value})} placeholder="e.g. DOT XXXX 4523" />
+                        <TextField
+                          fullWidth
+                          label="DOT Code (WWYY format)"
+                          value={grnData.dot_code}
+                          onChange={e => setGrnData({...grnData, dot_code: e.target.value})}
+                          placeholder="e.g. 1224  (Week 12, Year 2024)"
+                          helperText={
+                            dotPreview
+                              ? `📅 Mfg: ${dotPreview.toLocaleDateString('en-GB', { month:'long', year:'numeric' })} · Age: ${dotAgeYears} years${parseFloat(dotAgeYears) >= 5 ? ' 🔴 EXPIRED' : parseFloat(dotAgeYears) >= 4 ? ' 🟠 Critical' : parseFloat(dotAgeYears) >= 3 ? ' 🟡 Expiring Soon' : ' 🟢 Healthy'}`
+                              : grnData.dot_code ? 'Invalid format — enter 4 digits e.g. 1224' : 'Optional — or set Manufacture Date below'
+                          }
+                          FormHelperTextProps={{ sx: { fontWeight: 700, color: parseFloat(dotAgeYears) >= 5 ? 'error.main' : parseFloat(dotAgeYears) >= 4 ? 'warning.main' : 'success.main' } }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          type="date"
+                          label="Manufacture Date (if no DOT)"
+                          value={grnData.manufacture_date}
+                          onChange={e => setGrnData({...grnData, manufacture_date: e.target.value})}
+                          InputLabelProps={{ shrink: true }}
+                          helperText={grnData.manufacture_date && !grnData.dot_code ? `Age: ${((Date.now() - new Date(grnData.manufacture_date).getTime()) / (1000*60*60*24*365.25)).toFixed(1)} years` : 'DOT code takes priority if both entered'}
+                          FormHelperTextProps={{ sx: { fontWeight: 700 } }}
+                        />
                       </Grid>
                       <Grid item xs={12} sm={4}>
                         <TextField fullWidth type="number" label="Quantity Received *" value={grnData.stock} onChange={e=>setGrnData({...grnData,stock:e.target.value})} required inputProps={{min:1}} />

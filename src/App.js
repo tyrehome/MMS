@@ -388,7 +388,7 @@ const AppContent = () => {
       
       const { data, error } = await supabase.rpc('process_bulk_grn', {
         p_supplier_id: supplierId,
-        p_reference_number: grnPayload.reference_number,
+        p_reference_number: grnPayload.reference_number || null,
         p_notes: grnPayload.notes,
         p_items: grnPayload.items
       });

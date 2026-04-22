@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import {
   Typography, Grid, Card, Avatar, Modal,
   IconButton, Box, Button, Collapse, Divider, Chip,
-  LinearProgress, Stack
+  LinearProgress, Stack, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import {
   AttachMoney as AttachMoneyIcon,
@@ -41,12 +42,31 @@ function Dashboard({
   const currency = businessProfile?.currency || 'LKR';
   const [expanded, setExpanded] = useState(false);
   const [dataHealthOpen, setDataHealthOpen] = useState(false);
+  const [timeframe, setTimeframe] = useState('daily');
+
+  /* ── Lot Aging Alerts ── */
+  const [agingAlerts, setAgingAlerts] = useState({ expired: 0, critical: 0, expiringSoon: 0, items: [] });
+
+  useEffect(() => {
+    supabase.from('v_stock_aging')
+      .select('tire_id,brand,size,age_status,age_years,current_qty,manufacture_date')
+      .in('age_status', ['Expired', 'Critical', 'Expiring Soon'])
+      .then(({ data }) => {
+        if (!data) return;
+        setAgingAlerts({
+          expired:      data.filter(l => l.age_status === 'Expired').length,
+          critical:     data.filter(l => l.age_status === 'Critical').length,
+          expiringSoon: data.filter(l => l.age_status === 'Expiring Soon').length,
+          items: data.slice(0, 5)
+        });
+      });
+  }, [tires]);
 
   const handleExpandClick = () => setExpanded(!expanded);
 
   // --- LOGIC: EXTENDED ANALYTICS ---
   const extendedStats = useMemo(() => {
-    // 1. Worker Performance
+    // 1. Worker Performance (Simplified)
     const workerStats = workers.map(w => {
       const completedTasks = tasks.filter(t => t.worker_id === w.id && t.status === 'Completed').length;
       return { name: w.name, tasks: completedTasks };
@@ -169,13 +189,32 @@ function Dashboard({
     ];
   }, [tires, parts, sales, tasks, insights, extendedStats, currency]);
 
-  const salesData = useMemo(() =>
-    sales.map(sale => ({
-      date: new Date(sale.created_at).toLocaleDateString(),
-      sales: Number(sale.total) || 0,
-      profit: Number(sale.profit) || 0
-    })).sort((a, b) => new Date(a.date) - new Date(b.date))
-    , [sales]);
+  const salesData = useMemo(() => {
+    const groups = {};
+    
+    sales.forEach(sale => {
+      const d = new Date(sale.created_at);
+      let key;
+      
+      if (timeframe === 'daily') {
+        key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      } else if (timeframe === 'weekly') {
+        // Get start of week
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+        const startOfWeek = new Date(d.setDate(diff));
+        key = 'Week ' + startOfWeek.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      } else {
+        key = d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      }
+
+      if (!groups[key]) groups[key] = { date: key, sales: 0, profit: 0, rawDate: new Date(sale.created_at) };
+      groups[key].sales += Number(sale.total) || 0;
+      groups[key].profit += Number(sale.profit) || 0;
+    });
+
+    return Object.values(groups).sort((a, b) => a.rawDate - b.rawDate);
+  }, [sales, timeframe]);
 
   const tireData = useMemo(() =>
     tires.map(tire => ({
@@ -198,6 +237,48 @@ function Dashboard({
         </Stack>
       </Box>
 
+      {/* ── Stock Aging Alert Banner ── */}
+      {(agingAlerts.expired > 0 || agingAlerts.critical > 0 || agingAlerts.expiringSoon > 0) && (
+        <Box sx={{
+          mb: 4, p: 3, borderRadius: 4,
+          background: agingAlerts.expired > 0
+            ? 'linear-gradient(135deg,#ffebee,#fff8e1)'
+            : 'linear-gradient(135deg,#fff3e0,#fffde7)',
+          border: agingAlerts.expired > 0 ? '1.5px solid #ef9a9a' : '1.5px solid #ffe082',
+          display: 'flex', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap'
+        }}>
+          <Box sx={{ fontSize: 28, lineHeight: 1 }}>
+            {agingAlerts.expired > 0 ? '🔴' : '🟠'}
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontWeight: 900, fontSize: '1rem', color: agingAlerts.expired > 0 ? '#c62828' : '#e65100', mb: 0.5 }}>
+              {agingAlerts.expired > 0 ? '🚨 Expired Stock Detected — Immediate Action Required' : '⚠️  Old Stock Alert — Sell These Tires First (FIFO)'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1.5 }}>
+              {agingAlerts.expired > 0 && (
+                <Chip label={`🔴 ${agingAlerts.expired} EXPIRED batches`} size="small" sx={{ bgcolor: '#ffcdd2', color: '#c62828', fontWeight: 900 }} />
+              )}
+              {agingAlerts.critical > 0 && (
+                <Chip label={`🟠 ${agingAlerts.critical} Critical (4-5 yrs)`} size="small" sx={{ bgcolor: '#ffe0b2', color: '#e65100', fontWeight: 900 }} />
+              )}
+              {agingAlerts.expiringSoon > 0 && (
+                <Chip label={`🟡 ${agingAlerts.expiringSoon} Expiring Soon (3-4 yrs)`} size="small" sx={{ bgcolor: '#fff9c4', color: '#f57f17', fontWeight: 900 }} />
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {agingAlerts.items.filter(l => l.age_status !== 'Healthy').map((lot, i) => (
+                <Typography key={i} variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                  · {lot.brand} {lot.size} — {lot.age_years} yrs · {lot.current_qty} units
+                </Typography>
+              ))}
+            </Box>
+          </Box>
+          <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', alignSelf: 'center' }}>
+            Go to Inventory Hub → Stock
+          </Typography>
+        </Box>
+      )}
+
       {/* Primary KPI Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {statistics.slice(0, 4).map((stat, index) => (
@@ -205,11 +286,12 @@ function Dashboard({
             <Card
               onClick={stat.action}
               sx={{
-                p: 3,
+                p: 3, height: '100%',
                 borderRadius: 5,
                 bgcolor: 'background.paper',
                 border: '1px solid rgba(0,0,0,0.04)',
                 cursor: stat.action ? 'pointer' : 'default',
+                display: 'flex', flexDirection: 'column',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': { transform: 'translateY(-5px)', boxShadow: '0 15px 35px rgba(0,0,0,0.06)' }
               }}
@@ -262,15 +344,98 @@ function Dashboard({
 
       {/* Main Charts Section */}
       <Grid container spacing={4}>
+        {/* Operational Critical Center - Full Width Priority */}
+        <Grid item xs={12}>
+          <Card sx={{ p: 4, borderRadius: 5, border: '2px solid rgba(244, 67, 54, 0.12)', boxShadow: '0 8px 32px rgba(244, 67, 54, 0.05)' }}>
+            <Typography variant="h5" sx={{ fontWeight: 900, mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <WarningIcon color="error" sx={{ fontSize: 32 }} /> Operational Critical Center
+            </Typography>
+            <Grid container spacing={4}>
+              {/* Financial Position */}
+              <Grid item xs={12} md={4}>
+                <Box sx={{ p: 3, bgcolor: 'rgba(0,184,212,0.04)', borderRadius: 4, border: '1px solid rgba(0,184,212,0.1)', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 2, color: '#00b8d4' }}>Liquidity Balance</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                      <Typography variant="h4" sx={{ fontWeight: 900 }}>{extendedStats.financialHealth.toFixed(1)}%</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={Math.min(100, extendedStats.financialHealth)} 
+                    sx={{ height: 12, borderRadius: 6, bgcolor: 'rgba(0,0,0,0.05)', '& .MuiLinearProgress-bar': { borderRadius: 6 } }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', fontWeight: 700, fontSize: '0.75rem' }}>
+                    Receivables ({extendedStats.totalReceivables.toLocaleString()} {currency}) cover {extendedStats.financialHealth.toFixed(0)}% of payables ({extendedStats.totalPayables.toLocaleString()} {currency}).
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Low Stock Alerts */}
+              <Grid item xs={12} md={4}>
+                <Box sx={{ p: 3, bgcolor: 'rgba(244, 67, 54, 0.05)', borderRadius: 4, border: '1px solid rgba(244, 67, 54, 0.1)', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ color: 'error.main', fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <InventoryIcon /> Critical Stock Alerts
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {extendedStats.lowStockItems.length > 0 ? (
+                      extendedStats.lowStockItems.slice(0, 5).map((item, i) => (
+                        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <Typography variant="body2" sx={{ fontWeight: 800 }}>{item.name}</Typography>
+                           <Chip label={`${item.stock} LEFT`} size="small" color="error" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 900 }} />
+                        </Box>
+                      ))
+                    ) : (
+                       <Typography variant="body2" color="success.main" sx={{ fontWeight: 800 }}>All stock levels healthy.</Typography>
+                    )}
+                  </Stack>
+                </Box>
+              </Grid>
+
+              {/* Today's Appointments */}
+              <Grid item xs={12} md={4}>
+                <Box sx={{ p: 3, bgcolor: 'rgba(104, 58, 183, 0.04)', borderRadius: 4, border: '1px solid rgba(104, 58, 183, 0.1)', height: '100%' }}>
+                   <Typography variant="subtitle1" sx={{ color: '#683ab7', fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CalendarIcon /> Workshop Schedule
+                   </Typography>
+                   <Stack spacing={1.5}>
+                    {appointments.filter(a => new Date(a.date).toLocaleDateString() === new Date().toLocaleDateString()).length > 0 ? (
+                        appointments.filter(a => new Date(a.date).toLocaleDateString() === new Date().toLocaleDateString()).map((app, i) => (
+                          <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 800 }}>{app.customer_name}</Typography>
+                            <Chip label={new Date(app.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} size="small" sx={{ fontWeight: 900, bgcolor: 'rgba(104, 58, 183, 0.1)', color: '#683ab7' }} />
+                          </Box>
+                        ))
+                    ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>No appointments for today.</Typography>
+                    )}
+                   </Stack>
+                </Box>
+              </Grid>
+            </Grid>
+          </Card>
+        </Grid>
+
         {/* Revenue Chart */}
         <Grid item xs={12} md={8}>
           <Card sx={{ p: 4, borderRadius: 5 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 900 }}>Revenue Performance</Typography>
-                <Typography variant="caption" color="text.secondary">Daily tracking of sales vs net profit</Typography>
+                <Typography variant="caption" color="text.secondary">Tracking of sales vs net profit</Typography>
               </Box>
-              <Chip icon={<TrendingUpIcon />} label="Growing" color="success" size="small" sx={{ fontWeight: 800 }} />
+              <Stack direction="row" spacing={2} alignItems="center">
+                <ToggleButtonGroup 
+                  value={timeframe} 
+                  exclusive 
+                  onChange={(_, v) => v && setTimeframe(v)} 
+                  size="small"
+                  sx={{ bgcolor: 'rgba(0,0,0,0.03)', borderRadius: 2, '& .MuiToggleButton-root': { border: 'none', px: 2, fontWeight: 700, textTransform: 'none' } }}
+                >
+                  <ToggleButton value="daily">Daily</ToggleButton>
+                  <ToggleButton value="weekly">Weekly</ToggleButton>
+                  <ToggleButton value="monthly">Monthly</ToggleButton>
+                </ToggleButtonGroup>
+                <Chip icon={<TrendingUpIcon />} label="Growing" color="success" size="small" sx={{ fontWeight: 800 }} />
+              </Stack>
             </Box>
             <Box sx={{ height: 350 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -322,92 +487,6 @@ function Dashboard({
                     <Typography variant="body2" sx={{ fontWeight: 900 }}>{item.value.toLocaleString()} {currency}</Typography>
                   </Box>
                 ))}
-            </Stack>
-          </Card>
-        </Grid>
-
-        {/* Worker Leaderboard */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ p: 4, borderRadius: 5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
-              <TaskIcon color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Mechanical Efficiency</Typography>
-            </Box>
-            <Box sx={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={extendedStats.workerStats} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.04)" />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} tick={{ fontSize: 12, fontWeight: 700 }} />
-                  <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: 12, border: 'none' }} />
-                  <Bar dataKey="tasks" fill="#1a237e" radius={[0, 10, 10, 0]} barSize={25} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Critical Alerts & Quick Tasks */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ p: 4, borderRadius: 5, height: '100%' }}>
-            <Typography variant="h6" sx={{ fontWeight: 900, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <WarningIcon color="error" /> Operational Critical Center
-            </Typography>
-            <Stack spacing={2} sx={{ maxHeight: 310, overflowY: 'auto', pr: 1 }}>
-              {/* Financial Position */}
-              <Box sx={{ p: 2.5, bgcolor: 'rgba(0,184,212,0.04)', borderRadius: 4, border: '1px solid rgba(0,184,212,0.1)' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>Liquidity Balance</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 900 }}>{extendedStats.financialHealth.toFixed(1)}%</Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={Math.min(100, extendedStats.financialHealth)} 
-                  sx={{ height: 10, borderRadius: 5, bgcolor: 'rgba(0,0,0,0.05)', '& .MuiLinearProgress-bar': { borderRadius: 5 } }}
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', fontWeight: 600 }}>Receivables cover {extendedStats.financialHealth.toFixed(0)}% of payables</Typography>
-              </Box>
-
-              {/* Low Stock Alerts */}
-              {extendedStats.lowStockItems.length > 0 ? (
-                <Box sx={{ p: 2, bgcolor: 'rgba(244, 67, 54, 0.05)', borderRadius: 4, border: '1px solid rgba(244, 67, 54, 0.1)' }}>
-                  <Typography variant="subtitle2" sx={{ color: 'error.main', fontWeight: 900, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <InventoryIcon fontSize="small" /> Low Stock Items
-                  </Typography>
-                  <Stack spacing={1}>
-                    {extendedStats.lowStockItems.slice(0, 3).map((item, i) => (
-                      <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <Typography variant="caption" sx={{ fontWeight: 800 }}>{item.name}</Typography>
-                         <Chip label={`${item.stock} LEFT`} size="small" color="error" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 900 }} />
-                      </Box>
-                    ))}
-                    {extendedStats.lowStockItems.length > 3 && (
-                      <Typography variant="caption" color="error.main" sx={{ fontWeight: 800, mt: 1 }}>+ {extendedStats.lowStockItems.length - 3} more critically low items</Typography>
-                    )}
-                  </Stack>
-                </Box>
-              ) : (
-                <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'rgba(76, 175, 80, 0.05)', borderRadius: 4 }}>
-                   <Typography variant="body2" color="success.main" sx={{ fontWeight: 800 }}>All Stock Levels Healthy</Typography>
-                </Box>
-              )}
-
-              {/* Today's Appointments */}
-              <Box sx={{ p: 2, bgcolor: 'rgba(104, 58, 183, 0.04)', borderRadius: 4, border: '1px solid rgba(104, 58, 183, 0.1)' }}>
-                 <Typography variant="subtitle2" sx={{ color: '#683ab7', fontWeight: 900, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CalendarIcon fontSize="small" /> Today's Schedule
-                 </Typography>
-                 {appointments.filter(a => new Date(a.date).toLocaleDateString() === new Date().toLocaleDateString()).length > 0 ? (
-                    appointments.filter(a => new Date(a.date).toLocaleDateString() === new Date().toLocaleDateString()).map((app, i) => (
-                      <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700 }}>{app.customer_name}</Typography>
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#683ab7' }}>{new Date(app.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Typography>
-                      </Box>
-                    ))
-                 ) : (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>No appointments scheduled for today.</Typography>
-                 )}
-              </Box>
             </Stack>
           </Card>
         </Grid>
