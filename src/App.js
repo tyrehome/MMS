@@ -129,6 +129,7 @@ const AppContent = () => {
   const [tasks, setTasks] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [inventoryLots, setInventoryLots] = useState([]);
   const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -198,13 +199,14 @@ const AppContent = () => {
       fetchData('tasks', setTasks);
       fetchData('vehicles', setVehicles);
       fetchData('suppliers', setSuppliers);
+      fetchData('inventory_lots', setInventoryLots);
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
     const tables = [
       'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
       'customers', 'appointments', 'invoices', 'workers',
-      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data'
+      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data', 'inventory_lots'
     ];
 
     const channels = tables.map(table => {
@@ -220,7 +222,8 @@ const AppContent = () => {
               tires: setTires, hotel_tires: setHotelTires,
               accounts: setAccounts, parts: setParts, customers: setCustomers,
               appointments: setAppointments, invoices: setInvoices,
-              workers: setWorkers, tasks: setTasks, vehicles: setVehicles, suppliers: setSuppliers
+              workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
+              suppliers: setSuppliers, inventory_lots: setInventoryLots
             };
             if (setters[table]) {
               // Instead of full refetch, we could apply the delta, 
@@ -544,6 +547,7 @@ const AppContent = () => {
             accounts={accounts}
             vehicles={vehicles}
             appointments={appointments}
+            inventoryLots={inventoryLots}
             {...commonProps} 
           />
         ) : posComponent;
@@ -592,6 +596,7 @@ const AppContent = () => {
             accounts={accounts}
             vehicles={vehicles}
             appointments={appointments}
+            inventoryLots={inventoryLots}
             {...commonProps} 
           />
         ) : posComponent;

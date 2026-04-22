@@ -37,7 +37,8 @@ function Dashboard({
   suppliers = [], 
   accounts = [],
   appointments = [],
-  businessProfile 
+  businessProfile,
+  inventoryLots = [] 
 }) {
   const currency = businessProfile?.currency || 'LKR';
   const [expanded, setExpanded] = useState(false);
@@ -60,7 +61,7 @@ function Dashboard({
           items: data.slice(0, 5)
         });
       });
-  }, [tires]);
+  }, [tires, inventoryLots]);
 
   const handleExpandClick = () => setExpanded(!expanded);
 
