@@ -158,13 +158,23 @@ Create a `.env` file in the project root:
 ```env
 REACT_APP_SUPABASE_URL=https://your-project-id.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your-anon-key
+DIRECT_URL=postgresql://postgres:password@db.your-project.supabase.co:5432/postgres
 ```
+*Note: `DIRECT_URL` is required for the automation scripts.*
 
 ### 3. Set Up the Database
-1. Go to your Supabase project → **SQL Editor**
-2. Copy the entire contents of `schema.sql`
-3. Paste and click **Run**
-4. This creates all tables, views, functions, triggers, indexes, and RLS policies
+You can set up the database using the built-in automation scripts:
+
+```bash
+# 1. Initialize schema (tables, views, functions)
+npm run init
+
+# 2. Configure infrastructure (storage buckets, RLS, realtime)
+npm run setup
+
+# 3. (Optional) Inject sample data for testing
+npm run seed
+```
 
 ### 4. Run the App
 ```bash
@@ -203,10 +213,31 @@ TireManagementSystem/
 │   ├── supabaseClient.js          # Supabase client initialization
 │   ├── translations.js            # EN / Sinhala translations
 │   └── index.js
-├── schema.sql                     # Complete database schema
-├── .env                           # Environment variables (not committed)
+├── scripts/
+│   ├── run-schema.mjs         # Database schema initialization
+│   ├── setup-supabase.mjs     # Storage and Realtime configuration
+│   ├── seed-db.mjs            # Sample data injection
+│   └── cleanup-db.mjs         # Database reset tool
+├── schema.sql                 # Complete database schema
+├── cleanup.sql                # Full system reset logic
+├── .env                       # Environment variables (not committed)
 └── package.json
 ```
+
+---
+
+## 🧹 Database Cleanup & Reset
+
+The system includes a dedicated tool for performing a "Fresh Install" reset. This is useful for moving from testing to production or clearing out all sample data.
+
+```bash
+npm run cleanup
+```
+
+**This command will:**
+- Wipe all transactional data (Sales, GRNs, Tasks, Audit Logs).
+- Clear all Master Data (Tires, Parts, Suppliers, Customers).
+- Reset the system to a clean, empty state.
 
 ---
 
