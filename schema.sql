@@ -7,15 +7,18 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     role TEXT DEFAULT 'staff',
     name TEXT,
     email TEXT,
-    avatar_url TEXT
+    avatar_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.profiles REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS public.business_settings (
     id SERIAL PRIMARY KEY,
     name TEXT,
     logo_url TEXT,
     phone TEXT,
-    address TEXT
+    address TEXT,
+    currency TEXT DEFAULT 'LKR'
 );
 
 CREATE TABLE IF NOT EXISTS public.invitations (
@@ -42,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.tires (
     images TEXT[],
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.tires REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS public.parts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,6 +55,7 @@ CREATE TABLE IF NOT EXISTS public.parts (
     price NUMERIC DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.parts REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS public.workers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,6 +66,7 @@ CREATE TABLE IF NOT EXISTS public.workers (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.workers REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS public.hotel_tires (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -185,14 +191,18 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     date TEXT,
     time TEXT,
     status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'Standard',
+    is_billed BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.tasks REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS public.master_data (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type TEXT,
     value TEXT
 );
+ALTER TABLE public.master_data REPLICA IDENTITY FULL;
 
 -- Migrations for tires table
 ALTER TABLE public.tires ADD COLUMN IF NOT EXISTS thread_pattern TEXT;
@@ -638,27 +648,16 @@ CREATE INDEX IF NOT EXISTS idx_tasks_worker ON public.tasks(worker_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON public.sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_log(created_at DESC);
 
--- ==========================================
--- SECURITY HARDENING (ROW LEVEL SECURITY)
--- ==========================================
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tires ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.parts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.workers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.grns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.supplier_returns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.shop_talk ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.inventory_lots ENABLE ROW LEVEL SECURITY;
+-- Everyone can see profiles
+CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
+-- Users can update their OWN profile
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+-- Admins have full access to all profiles
+CREATE POLICY "Admins have full access" ON public.profiles FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
--- Note: In a production Supabase environment, you would define specific policies.
--- For now, we enable full access to all authenticated users.
+-- Note: We enable full access to all authenticated users for operational tables.
 DO $$
 DECLARE
     t text;
@@ -668,11 +667,12 @@ BEGIN
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
         AND table_type = 'BASE TABLE'
+        AND table_name != 'profiles'
     LOOP
         BEGIN
             EXECUTE format('CREATE POLICY "Allow authenticated users" ON public.%I FOR ALL TO authenticated USING (true);', t);
         EXCEPTION WHEN duplicate_object THEN
-            -- Policy already exists
+            NULL;
         END;
     END LOOP;
 END $$;
@@ -987,3 +987,34 @@ $$;
 -- Reload Schema Cache
 NOTIFY pgrst, 'reload schema';
 
+-- ==========================================
+-- REALTIME EXTENSIONS (REPLICA IDENTITY)
+-- ==========================================
+ALTER TABLE public.sales REPLICA IDENTITY FULL;
+ALTER TABLE public.sale_items REPLICA IDENTITY FULL;
+ALTER TABLE public.inventory_lots REPLICA IDENTITY FULL;
+ALTER TABLE public.suppliers REPLICA IDENTITY FULL;
+ALTER TABLE public.accounts REPLICA IDENTITY FULL;
+
+-- ==========================================
+-- STORAGE CONFIGURATION
+-- ==========================================
+-- These policies ensure your buckets exist and are protected
+-- Note: Run these in the Supabase SQL editor to ensure buckets are initialized.
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('tires', 'tires', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('logos', 'logos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage Policies for 'tires' bucket
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'tires');
+CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'tires' AND auth.role() = 'authenticated');
+CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE USING (bucket_id = 'tires' AND auth.role() = 'authenticated');
+
+-- Storage Policies for 'logos' bucket
+CREATE POLICY "Public Logo Access" ON storage.objects FOR SELECT USING (bucket_id = 'logos');
+CREATE POLICY "Authenticated Logo Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'logos' AND auth.role() = 'authenticated');
