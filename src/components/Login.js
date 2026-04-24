@@ -72,7 +72,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [branding, setBranding] = useState({ name: 'Dost Auto Tires', logoUrl: '' });
+    const [branding, setBranding] = useState({ name: 'TyreShops', logoUrl: '' });
 
     useEffect(() => {
         const fetchBranding = async () => {

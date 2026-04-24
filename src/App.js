@@ -136,7 +136,7 @@ const AppContent = () => {
   const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [businessProfile, setBusinessProfile] = useState({ name: 'Dost Auto Tires', logo_url: '', currency: 'LKR' });
+  const [businessProfile, setBusinessProfile] = useState({ name: 'TyreShops', logo_url: '', currency: 'LKR' });
   const [masterData, setMasterData] = useState({ brands: [], vehicles: [], services: [] });
   const [billingDraft, setBillingDraft] = useState(null);
   const [dataError, setDataError] = useState(null);
@@ -251,6 +251,7 @@ const AppContent = () => {
       channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [user]);
+
 
   const [userProfile, setUserProfile] = useState({ name: "User", role: "", avatar: "" });
 
