@@ -34,7 +34,7 @@ async function setup() {
         // 2. Setup Storage RLS Policies
         console.log('🔐 Applying Storage RLS policies...');
         const storagePolicies = [
-            -- Tires policies
+            // Tires policies
             `DROP POLICY IF EXISTS "Public Access" ON storage.objects`,
             `CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'tires')`,
             `DROP POLICY IF EXISTS "Authenticated Upload" ON storage.objects`,
@@ -43,7 +43,7 @@ async function setup() {
             `CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE USING (bucket_id = 'tires' AND auth.role() = 'authenticated')`,
             `DROP POLICY IF EXISTS "Authenticated Delete" ON storage.objects`,
             `CREATE POLICY "Authenticated Delete" ON storage.objects FOR DELETE USING (bucket_id = 'tires' AND auth.role() = 'authenticated')`,
-            -- Logos policies
+            // Logos policies
             `DROP POLICY IF EXISTS "Public Logo Access" ON storage.objects`,
             `CREATE POLICY "Public Logo Access" ON storage.objects FOR SELECT USING (bucket_id = 'logos')`,
             `DROP POLICY IF EXISTS "Authenticated Logo Upload" ON storage.objects`,

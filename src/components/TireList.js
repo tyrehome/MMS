@@ -171,37 +171,69 @@ const TireList = ({
     if (!grnData.brand || !grnData.size || !grnData.stock) {
       setAlert({ open:true, message:'Complete all required fields.', severity:'error' }); return;
     }
-    
-    // Resolve manufacture date: prefer manual date, else derive from DOT
-    let resolvedMfgDate = grnData.manufacture_date || '';
-    if (!resolvedMfgDate && grnData.dot_code) {
-      const parsed = parseDotCode(grnData.dot_code);
-      if (parsed) resolvedMfgDate = parsed.toISOString().split('T')[0];
+
+    setUploading(true);
+    let imageUrls = grnData.images || [];
+
+    try {
+      if (selectedFile) {
+        const compressed = await compressImage(selectedFile);
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `grn/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('tires')
+          .upload(filePath, compressed);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('tires')
+          .getPublicUrl(filePath);
+        
+        imageUrls = [publicUrl, ...imageUrls];
+      }
+
+      // Resolve manufacture date: prefer manual date, else derive from DOT
+      let resolvedMfgDate = grnData.manufacture_date || '';
+      if (!resolvedMfgDate && grnData.dot_code) {
+        const parsed = parseDotCode(grnData.dot_code);
+        if (parsed) resolvedMfgDate = parsed.toISOString().split('T')[0];
+      }
+
+      const newItem = {
+        ...grnData,
+        type: 'tire',
+        id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        quantity: parseInt(grnData.stock),
+        cost_price: parseFloat(grnData.cost_price || 0),
+        price: parseFloat(grnData.price || 0),
+        label: `${grnData.brand} ${grnData.size} (${grnData.model || 'No Model'})`,
+        images: imageUrls,
+        thread_pattern: grnData.thread_pattern || '',
+        origin: grnData.origin || '',
+        dot_code: grnData.dot_code || '',
+        manufacture_date: resolvedMfgDate,
+      };
+
+      setGrnItems(prev => [...prev, newItem]);
+      setAlert({ open: true, message: `✅ Added to GRN list${resolvedMfgDate ? ` (Mfg: ${resolvedMfgDate})` : ''}`, severity: 'success' });
+      
+      // Reset form
+      setGrnData({
+        brand:'', model:'', size:'', tire_category:'New',
+        stock:'', cost_price:'', price:'', vehicle_type:'',
+        dot_code:'', manufacture_date:'', origin:'', thread_pattern:'',
+        supplier_id: grnData.supplier_id
+      });
+      setSelectedFile(null);
+    } catch (err) {
+      console.error('Error in GRN submission:', err);
+      setAlert({ open: true, message: 'Failed to process item: ' + err.message, severity: 'error' });
+    } finally {
+      setUploading(false);
     }
-
-    const newItem = {
-      ...grnData,
-      type: 'tire',
-      id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      quantity: parseInt(grnData.stock),
-      cost_price: parseFloat(grnData.cost_price || 0),
-      price: parseFloat(grnData.price || 0),
-      label: `${grnData.brand} ${grnData.size} (${grnData.model || 'No Model'})`,
-      images: grnData.images || [],
-      thread_pattern: grnData.thread_pattern || '',
-      origin: grnData.origin || '',
-      dot_code: grnData.dot_code || '',
-      manufacture_date: resolvedMfgDate,
-    };
-
-    setGrnItems(prev => [...prev, newItem]);
-    setAlert({ open: true, message: `✅ Added to GRN list${resolvedMfgDate ? ` (Mfg: ${resolvedMfgDate})` : ''}`, severity: 'success' });
-    setGrnData({
-      brand:'', model:'', size:'', tire_category:'New',
-      stock:'', cost_price:'', price:'', vehicle_type:'',
-      dot_code:'', manufacture_date:'', origin:'', thread_pattern:'',
-      supplier_id: grnData.supplier_id
-    });
   };
 
   /* ─── Parts GRN ─── */
@@ -1005,8 +1037,8 @@ const TireList = ({
                       )}
                       <Grid item xs={12}>
                         <Divider sx={{my:1}}/>
-                        <Button variant="contained" fullWidth size="large" type="submit" sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<AddIcon/>}>
-                          ADD TO GRN LIST
+                        <Button variant="contained" fullWidth size="large" type="submit" disabled={uploading} sx={{py:2,borderRadius:3,fontWeight:900,mt:1}} startIcon={<AddIcon/>}>
+                          {uploading ? 'UPLOADING IMAGE...' : 'ADD TO GRN LIST'}
                         </Button>
                       </Grid>
                     </Grid>

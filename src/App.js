@@ -50,25 +50,21 @@ import SupplierManagement from "./components/SupplierManagement";
 
 const SupplierIcon = LocalShippingIcon;
 const drawerWidth = 240;
+const miniDrawerWidth = 72;
 
 const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })(
   ({ theme, open }) => ({
     flexGrow: 1,
     padding: theme.spacing(3),
-    transition: theme.transitions.create("margin", {
+    transition: theme.transitions.create(["margin", "padding"], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
     }),
-    marginLeft: `-${drawerWidth}px`,
-    ...(open && {
-      transition: theme.transitions.create("margin", {
-        easing: theme.transitions.easing.easeOut,
-        duration: theme.transitions.duration.enteringScreen,
-      }),
-      marginLeft: 0,
-    }),
+    marginLeft: 0,
+    [theme.breakpoints.up("sm")]: {
+      marginLeft: open ? 0 : `0px`, // Logic handled by Drawer being permanent
+    },
     [theme.breakpoints.down("sm")]: {
-      marginLeft: 0,
       padding: theme.spacing(1.5),
     },
   })
@@ -77,22 +73,27 @@ const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })(
 const StyledAppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
-  transition: theme.transitions.create(["margin", "width"], {
+  zIndex: theme.zIndex.drawer + 1,
+  transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
   ...(open && {
+    marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
-    marginLeft: `${drawerWidth}px`,
-    transition: theme.transitions.create(["margin", "width"], {
-      easing: theme.transitions.easing.easeOut,
+    transition: theme.transitions.create(["width", "margin"], {
+      easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
     }),
   }),
-  [theme.breakpoints.down("sm")]: {
-    width: "100%",
-    marginLeft: 0,
-  },
+  ...(!open && {
+    marginLeft: miniDrawerWidth,
+    width: `calc(100% - ${miniDrawerWidth}px)`,
+    [theme.breakpoints.down("sm")]: {
+      width: '100%',
+      marginLeft: 0
+    }
+  }),
 }));
 
 const DrawerHeader = styled("div")(({ theme }) => ({
@@ -212,6 +213,7 @@ const AppContent = () => {
     const channels = tables.map(table => {
       return supabase.channel(`public:${table}`)
         .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+          console.log(`[Realtime] Change detected in ${table}:`, payload);
           // Optimized Refresh logic
           if (table === 'master_data') fetchMasterData();
           else if (table === 'business_settings') fetchBusinessSettings();
@@ -471,68 +473,78 @@ const AppContent = () => {
   ];
 
   const drawer = (
-    <div>
-      <Logo>
+    <div style={{ overflowX: 'hidden' }}>
+      <Logo sx={{ p: open ? 3 : 2, justifyContent: open ? 'flex-start' : 'center' }}>
         {businessProfile.logo_url ? (
-          <img src={businessProfile.logo_url} alt="Logo" style={{ height: 40, marginRight: 8 }} />
+          <img src={businessProfile.logo_url} alt="Logo" style={{ height: 40, marginRight: open ? 8 : 0 }} />
         ) : (
-          <BuildCircleIcon sx={{ fontSize: 36, mr: 1.5, color: 'primary.main' }} />
+          <BuildCircleIcon sx={{ fontSize: 36, mr: open ? 1.5 : 0, color: 'primary.main' }} />
         )}
-        <Typography variant="h6" noWrap sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '-0.5px' }}>
-          {businessProfile.name}
-        </Typography>
+        {open && (
+          <Typography variant="h6" noWrap sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '-0.5px' }}>
+            {businessProfile.name}
+          </Typography>
+        )}
       </Logo>
       <Divider sx={{ opacity: 0.6 }} />
-      <Box sx={{ p: 2, display: "flex", alignItems: "center" }}>
-        <Avatar src={userProfile.avatar} alt={userProfile.name} sx={{ mr: 2 }} />
-        <Box>
-          <Typography variant="subtitle1">{userProfile.name}</Typography>
-          <Typography variant="body2" color="textSecondary">{userProfile.role}</Typography>
-        </Box>
+      <Box sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: open ? 'flex-start' : 'center' }}>
+        <Avatar src={userProfile.avatar} alt={userProfile.name} sx={{ mr: open ? 2 : 0 }} />
+        {open && (
+          <Box>
+            <Typography variant="subtitle1">{userProfile.name}</Typography>
+            <Typography variant="body2" color="textSecondary">{userProfile.role}</Typography>
+          </Box>
+        )}
       </Box>
       <Divider />
       <List>
         {menuItems
           .filter(item => !item.adminOnly || isAdmin)
           .map((item) => (
-            <ListItem 
-              button 
-              key={item.text} 
-              onClick={() => { setSelectedComponent(item.component); if (isMobile) setOpen(false); }} 
-              selected={selectedComponent === item.component}
-              sx={{
-                mx: 1.5,
-                my: 0.5,
-                borderRadius: 3,
-                width: 'auto',
-                transition: 'all 0.2s',
-                '&.Mui-selected': {
-                  bgcolor: 'primary.light',
-                  color: 'primary.main',
-                  '& .MuiListItemIcon-root': { color: 'primary.main' },
-                  '&:hover': { bgcolor: 'primary.light' }
-                },
-                '&:hover': {
-                  bgcolor: 'rgba(0,0,0,0.02)',
-                  transform: 'translateX(4px)'
-                }
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 45, color: 'text.secondary', transition: 'color 0.2s' }}>{item.icon}</ListItemIcon>
-              <ListItemText 
-                primary={item.text} 
-                primaryTypographyProps={{ 
-                  fontWeight: selectedComponent === item.component ? 800 : 600,
-                  fontSize: '0.9rem'
-                }} 
-              />
-            </ListItem>
+            <Tooltip title={!open ? item.text : ""} placement="right">
+              <ListItem 
+                button 
+                key={item.text} 
+                onClick={() => { setSelectedComponent(item.component); if (isMobile) setOpen(false); }} 
+                selected={selectedComponent === item.component}
+                sx={{
+                  mx: open ? 1.5 : 1,
+                  my: 0.5,
+                  borderRadius: 3,
+                  width: 'auto',
+                  justifyContent: open ? 'initial' : 'center',
+                  px: open ? 2.5 : 1.5,
+                  transition: 'all 0.2s',
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.main',
+                    '& .MuiListItemIcon-root': { color: 'primary.main' },
+                    '&:hover': { bgcolor: 'primary.light' }
+                  },
+                  '&:hover': {
+                    bgcolor: 'rgba(0,0,0,0.02)',
+                    transform: open ? 'translateX(4px)' : 'scale(1.1)'
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: open ? 45 : 0, mr: open ? 0 : 'auto', justifyContent: 'center', color: 'text.secondary', transition: 'color 0.2s' }}>{item.icon}</ListItemIcon>
+                {open && (
+                  <ListItemText 
+                    primary={item.text} 
+                    primaryTypographyProps={{ 
+                      fontWeight: selectedComponent === item.component ? 800 : 600,
+                      fontSize: '0.9rem'
+                    }} 
+                  />
+                )}
+              </ListItem>
+            </Tooltip>
           ))}
       </List>
     </div>
   );
   const renderComponent = () => {
-    const commonProps = { businessProfile, masterData, suppliers, recordAudit };
+    const commonProps = { businessProfile, masterData, suppliers, recordAudit, isAdmin };
     const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
 
     switch (selectedComponent) {
@@ -619,7 +631,7 @@ const AppContent = () => {
         <Box sx={{ display: "flex", minHeight: '100vh', bgcolor: 'background.default' }}>
           <StyledAppBar position="fixed" open={open}>
             <Toolbar>
-              <IconButton color="inherit" onClick={handleDrawerToggle} edge="start" sx={{ mr: 2, ...(open && { display: { sm: "none" } }) }}><MenuIcon /></IconButton>
+              <IconButton color="inherit" onClick={handleDrawerToggle} edge="start" sx={{ mr: 2 }}><MenuIcon /></IconButton>
               <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
                 <Typography variant="h6" noWrap sx={{ color: 'primary.main', fontWeight: 800 }}>
                   {businessProfile.name}
@@ -689,14 +701,27 @@ const AppContent = () => {
             </Toolbar>
           </StyledAppBar>
           <Drawer 
-            sx={{ width: drawerWidth, flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }} 
-            variant={isMobile ? "temporary" : "persistent"} 
+            sx={{ 
+              width: open ? drawerWidth : miniDrawerWidth, 
+              flexShrink: 0, 
+              whiteSpace: 'nowrap',
+              "& .MuiDrawer-paper": { 
+                width: open ? drawerWidth : miniDrawerWidth, 
+                boxSizing: "border-box",
+                transition: theme.transitions.create("width", {
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.enteringScreen,
+                }),
+                overflowX: 'hidden'
+              } 
+            }} 
+            variant={isMobile ? "temporary" : "permanent"} 
             anchor="left" 
             open={open} 
             onClose={() => setOpen(false)}
             ModalProps={{
-              keepMounted: true, // Better open performance on mobile
-              disableScrollLock: true // Avoid jumping issues
+              keepMounted: true, 
+              disableScrollLock: true 
             }}
           >
             {drawer}

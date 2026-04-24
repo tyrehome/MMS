@@ -177,7 +177,7 @@ function Dashboard({
     const totalParts = parts.reduce((sum, part) => sum + (Number(part.stock) || 0), 0);
     const totalSalesValue = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
     const totalProfit = sales.reduce((sum, sale) => sum + (Number(sale.profit) || 0), 0);
-    const activeTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length;
+    const activeTasks = tasks.filter(t => t.status !== 'Completed').length;
 
     return [
       { icon: <AttachMoneyIcon />, label: "Today's Revenue", value: `${insights.todayRev.toLocaleString()} ${currency}`, sub: `${insights.revChange >= 0 ? '+' : ''}${insights.revChange.toFixed(1)}% vs yesterday` },

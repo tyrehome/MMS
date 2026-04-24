@@ -14,7 +14,7 @@ import {
 import { format } from 'date-fns';
 import { supabase } from '../supabaseClient';
 
-const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, setSelectedComponent }) => {
+const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, setSelectedComponent, isAdmin }) => {
   const [workers, setWorkers] = useState(workersList);
   const [tasks, setTasks] = useState(tasksList);
   const [tabValue, setTabValue] = useState(0);
@@ -72,8 +72,13 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
     setSnackbar({ open: true, message: 'Mission achieved' });
   };
 
-  const handleBillTask = (task) => {
+  const handleBillTask = async (task) => {
+    // 1. Mark as billed in DB to prevent multiple bills
+    await supabase.from('tasks').update({ is_billed: true }).eq('id', task.id);
+    
+    // 2. Set the draft and switch view
     setBillingDraft({
+      id: task.id, // Keep track of task ID in draft
       customer_name: task.customer_name,
       vehicle_number: task.vehicle_number,
       service_name: task.task,
@@ -82,6 +87,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
       worker_id: task.worker_id
     });
     setSelectedComponent("SaleForm");
+    setSnackbar({ open: true, message: 'Billing draft generated' });
   };
 
   const getWorkerStats = (workerId) => {
@@ -111,9 +117,11 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
 
       {tabValue === 0 && (
         <Box>
-          <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditingWorker(null); setWorkerFormData({ name: '', role: '', phone: '' }); setIsWorkerModalOpen(true); }} sx={{ borderRadius: 3, px: 4, fontWeight: 900 }}>ONBOARD PERSONNEL</Button>
-          </Box>
+          {isAdmin && (
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditingWorker(null); setWorkerFormData({ name: '', role: '', phone: '' }); setIsWorkerModalOpen(true); }} sx={{ borderRadius: 3, px: 4, fontWeight: 900 }}>ONBOARD PERSONNEL</Button>
+            </Box>
+          )}
 
           <Grid container spacing={3} sx={{ mb: 6 }}>
             {[{ l: 'Total Operatives', v: workers.length, c: 'primary.main' }, { l: 'Queue Active', v: tasks.filter(t => t.status !== 'Completed').length, c: 'secondary.main' }, { l: 'Efficiency Index', v: `${tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'Completed').length / tasks.length) * 100) : 0}%`, c: 'success.main' }].map((s, i) => (
@@ -230,7 +238,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                               <CheckCircleIcon />
                             </IconButton>
                           )}
-                          {task.status === 'Completed' && (
+                          {task.status === 'Completed' && !task.is_billed && (
                             <Button 
                               size="small" 
                               variant="contained" 
@@ -240,6 +248,9 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                             >
                               GENERATE BILL
                             </Button>
+                          )}
+                          {task.is_billed && (
+                            <Chip label="BILLED" size="small" variant="outlined" color="success" sx={{ fontWeight: 900, fontSize: '0.6rem' }} />
                           )}
                         </Box>
                       </TableCell>
