@@ -1,32 +1,26 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Typography, Box, Grid, Card, CardContent, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Chip, TextField, InputAdornment, Button, IconButton,
-  Collapse, Avatar, MenuItem, Select, FormControl, InputLabel, Tooltip,
+  Avatar, 
   Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert,
-  ToggleButton, ToggleButtonGroup, Divider
+  ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import {
   LocalShipping as SupplierIcon,
   Search as SearchIcon,
   AttachMoney as CashIcon,
   History as HistoryIcon,
-  Receipt as ReceiptIcon,
-  CalendarToday as CalendarIcon,
   Payments as PaymentsIcon,
   AccountBalance as BankIcon,
-  MoreVert as MoreVertIcon,
-  Print as PrintIcon,
-  Download as DownloadIcon,
-  Close as CloseIcon,
-  CreditCard as CheckIcon
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) => {
-  const { isAdmin } = useAuth();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [openPayDialog, setOpenPayDialog] = useState(false);
