@@ -4,7 +4,8 @@ import {
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
     Chip, TextField, InputAdornment, Button, IconButton,
     Collapse, Avatar, MenuItem, Select, FormControl, InputLabel,
-    Dialog, DialogTitle, DialogContent, DialogActions
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Snackbar, Alert
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -48,23 +49,90 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
     const [paymentAmount, setPaymentAmount] = useState(0);
     const [openVendorStatement, setOpenVendorStatement] = useState(false);
     const [selectedSupplierForStatement, setSelectedSupplierForStatement] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
     const currency = businessProfile?.currency || 'LKR';
 
     // Fetch audit logs when on audit tab
     const fetchAuditLogs = async () => {
         setLoadingAudit(true);
-        const { data, error } = await supabase
-            .from('audit_log')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(200);
-        if (!error && data) setAuditLogs(data);
-        setLoadingAudit(false);
+        try {
+            // 1. Fetch raw logs
+            const { data: logs, error: logsError } = await supabase
+                .from('audit_log')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
+
+            if (logsError) throw logsError;
+
+            if (logs && logs.length > 0) {
+                // 2. Extract unique user IDs
+                const userIds = [...new Set(logs.map(log => log.user_id).filter(Boolean))];
+
+                if (userIds.length > 0) {
+                    // 3. Fetch corresponding profiles
+                    const { data: profiles, error: pError } = await supabase
+                        .from('profiles')
+                        .select('id, name, email')
+                        .in('id', userIds);
+
+                    if (!pError && profiles) {
+                        const profilesMap = profiles.reduce((acc, p) => {
+                            acc[p.id] = p;
+                            return acc;
+                        }, {});
+
+                        // 4. Enrich logs with profile data
+                        const enrichedData = logs.map(log => ({
+                            ...log,
+                            profiles: profilesMap[log.user_id] || null
+                        }));
+                        setAuditLogs(enrichedData);
+                    } else {
+                        setAuditLogs(logs);
+                    }
+                } else {
+                    setAuditLogs(logs);
+                }
+            } else {
+                setAuditLogs([]);
+            }
+        } catch (error) {
+            console.error('Audit fetch error:', error);
+            setSnackbar({ open: true, message: `Failed to load logs: ${error.message}`, severity: 'error' });
+        } finally {
+            setLoadingAudit(false);
+        }
     };
 
     useEffect(() => {
-        if (hubTab === 3) fetchAuditLogs();
+        if (hubTab === 3) {
+            fetchAuditLogs();
+            
+            // Realtime listener for audit logs
+            const channel = supabase.channel('audit_changes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log' }, async (payload) => {
+                    let newLog = payload.new;
+                    
+                    // Enrichment: If there's a user_id, fetch the profile name so it's not empty in UI
+                    if (newLog.user_id) {
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('name, email')
+                            .eq('id', newLog.user_id)
+                            .single();
+                        if (profile) newLog.profiles = profile;
+                    }
+                    
+                    setAuditLogs(prev => [newLog, ...prev].slice(0, 200));
+                })
+                .subscribe();
+            
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        }
     }, [hubTab]);
 
     // Analytics Logic
@@ -158,9 +226,27 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
 
     return (
         <Box sx={{ p: 2 }}>
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Finance & Ledger Hub</Typography>
-                <Typography variant="body1" color="text.secondary">Administrative control over business performance, sales history, and audit trail</Typography>
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
+                <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Finance & Ledger Hub</Typography>
+                    <Typography variant="body1" color="text.secondary">Administrative control over business performance, sales history, and audit trail</Typography>
+                </Box>
+                
+                {/* Global Stats Header - Quick Access */}
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Card sx={{ bgcolor: 'primary.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>REVENUE (TO DATE)</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{pandLData.revenue.toLocaleString()} {currency}</Typography>
+                    </Card>
+                    <Card sx={{ bgcolor: 'error.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>TOTAL PAYABLES</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{suppliers.reduce((s, a) => s + Number(a.payable_balance || 0), 0).toLocaleString()} {currency}</Typography>
+                    </Card>
+                    <Card sx={{ bgcolor: 'warning.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>RECEIVABLES</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{accounts.reduce((s, a) => s + Number(a.receivable || 0), 0).toLocaleString()} {currency}</Typography>
+                    </Card>
+                </Box>
             </Box>
 
             <Tabs
@@ -676,8 +762,9 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 900, py: 2.5, width: 220 }}>DATE & TIME</TableCell>
-                                        <TableCell sx={{ fontWeight: 900, width: 200 }}>ACTION</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, py: 2.5, width: 180 }}>DATE & TIME</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, width: 160 }}>ACTION</TableCell>
+                                        <TableCell sx={{ fontWeight: 900, width: 160 }}>PERFORMED BY</TableCell>
                                         <TableCell sx={{ fontWeight: 900, width: 120 }}>ENTITY</TableCell>
                                         <TableCell sx={{ fontWeight: 900 }}>TRANSACTION DETAILS</TableCell>
                                     </TableRow>
@@ -724,6 +811,17 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                                 </Typography>
                                             </TableCell>
                                             <TableCell sx={{ verticalAlign: 'top' }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.main' }}>
+                                                        {log.profiles?.name?.[0] || '?'}
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Typography sx={{ fontWeight: 800, fontSize: '0.8rem' }}>{log.profiles?.name || 'System'}</Typography>
+                                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{log.profiles?.email || 'automated'}</Typography>
+                                                    </Box>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ verticalAlign: 'top' }}>
                                                 <Typography sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                                                     {log.table_name || 'System'}
                                                 </Typography>
@@ -761,6 +859,11 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                     </Card>
                 </Box>
             )}
+            <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+                <Alert severity={snackbar.severity} sx={{ width: '100%', borderRadius: 3, fontWeight: 700 }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

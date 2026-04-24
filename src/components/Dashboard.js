@@ -2,18 +2,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   Typography, Grid, Card, Avatar, Modal,
-  IconButton, Box, Button, Collapse, Divider, Chip,
+  IconButton, Box, Button, Collapse, Chip,
   LinearProgress, Stack, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import {
   AttachMoney as AttachMoneyIcon,
   TrendingUp as TrendingUpIcon, ShowChart as ShowChartIcon,
   Close as CloseIcon, Inventory as InventoryIcon,
-  Category as CategoryIcon,
   Speed as SpeedIcon, TrendingDown as TrendingDownIcon,
   Analytics as AnalyticsIcon, ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  AssignmentTurnedIn as TaskIcon,
   People as PeopleIcon,
   Warning as WarningIcon,
   NotificationsActive as AlertIcon,
@@ -22,8 +20,7 @@ import {
 } from '@mui/icons-material';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart,
-  BarChart, Bar, Legend
+  ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
 const COLORS = ['#1a237e', '#f50057', '#00c853', '#ff6d00', '#6200ea', '#00b8d4', '#ffd600', '#ff1744'];
@@ -217,12 +214,6 @@ function Dashboard({
     return Object.values(groups).sort((a, b) => a.rawDate - b.rawDate);
   }, [sales, timeframe]);
 
-  const tireData = useMemo(() =>
-    tires.map(tire => ({
-      name: tire.brand,
-      stock: Number(tire.stock) || 0,
-    })).sort((a, b) => b.stock - a.stock).slice(0, 10)
-    , [tires]);
 
   return (
     <Box sx={{ py: 2 }}>

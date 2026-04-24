@@ -516,33 +516,52 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                               />
                             )}
                           </Box>
-                          {item.image && (
-                            <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 1 }}>
+                          {item.image ? (
+                            <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 1, position: 'relative' }}>
                               <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {badge && (
+                                <Box sx={{ 
+                                  position: 'absolute', 
+                                  bottom: 0, 
+                                  left: 0, 
+                                  right: 0, 
+                                  p: 1, 
+                                  background: `linear-gradient(to top, ${badge.bg}, transparent)`,
+                                  backdropFilter: 'blur(4px)',
+                                  borderTop: `1px solid ${badge.color}33`
+                                }}>
+                                  <Typography sx={{ fontWeight: 900, fontSize: '0.65rem', color: badge.color, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    {badge.icon} {badge.label}
+                                  </Typography>
+                                  {oldestLot && (
+                                    <Typography variant="caption" sx={{ color: badge.color, opacity: 0.9, display:'block', mt: 0.2, fontSize: '0.6rem', fontWeight: 700 }}>
+                                      Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
                             </Box>
+                          ) : (
+                            badge && (
+                              <Box sx={{ mb: 1, p: 1, borderRadius: 2, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
+                                <Typography sx={{ fontWeight: 900, fontSize: '0.72rem', color: badge.color, lineHeight: 1.2 }}>
+                                  {badge.icon} {badge.label}
+                                </Typography>
+                                {oldestLot && (
+                                  <Typography variant="caption" sx={{ color: badge.color, opacity: 0.85, display:'block', mt:0.2, fontSize: '0.68rem', fontWeight: 700 }}>
+                                    Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )
                           )}
-                          <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{item.name}</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.5 }}>{item.name}</Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{item.subtitle}</Typography>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5, mb: badge ? 1 : 0, alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, mb: 1, alignItems: 'center' }}>
                             <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: '0.85rem' }}>
                               {item.price > 0 ? `${item.price} ${currency}` : 'Set price'}
                             </Typography>
                           </Box>
-                          
-                          {/* FIFO Age Badge */}
-                          {badge && (
-                            <Box sx={{ mt: 0.5, p: 1, borderRadius: 2, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
-                              <Typography sx={{ fontWeight: 900, fontSize: '0.72rem', color: badge.color, lineHeight: 1.2 }}>
-                                {badge.icon} {badge.label}
-                              </Typography>
-                              {oldestLot && (
-                                <Typography variant="caption" sx={{ color: badge.color, opacity: 0.85, display:'block', mt:0.2, fontSize: '0.68rem', fontWeight: 700 }}>
-                                  📅 Mfg: {new Date(oldestLot.manufacture_date).toLocaleDateString('en-US', {month: 'long', year: 'numeric'})} · Age: {(Number(oldestLot.age_years) || 0).toFixed(1)} yrs
-                                  {oldestLot.dot_code ? ` · DOT ${oldestLot.dot_code}` : ''}
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
 
                           <Button
                             fullWidth size="small" variant="contained"
@@ -581,31 +600,51 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                       outline: badge && badge.color !== '#2e7d32' ? `2px solid ${badge.color}33` : undefined
                     }}>
                       <CardContent sx={{ p: 2 }}>
-                        {t.images && t.images.length > 0 && (
-                          <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                        {t.images && t.images.length > 0 ? (
+                          <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'relative' }}>
                             <img src={t.images[0]} alt={t.brand} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {badge && (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                bottom: 0, 
+                                left: 0, 
+                                right: 0, 
+                                p: 1, 
+                                background: `linear-gradient(to top, ${badge.bg}, transparent)`,
+                                backdropFilter: 'blur(4px)',
+                                borderTop: `1px solid ${badge.color}33`
+                              }}>
+                                <Typography sx={{ fontWeight: 900, fontSize: '0.65rem', color: badge.color, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {badge.icon} {badge.label}
+                                </Typography>
+                                {oldestLot && (
+                                  <Typography variant="caption" sx={{ color: badge.color, opacity: 0.9, display:'block', mt:0.2, fontSize: '0.6rem', fontWeight: 700 }}>
+                                    Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
                           </Box>
+                        ) : (
+                          badge && (
+                            <Box sx={{ mb: 1.5, p: 1, borderRadius: 2, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
+                              <Typography sx={{ fontWeight: 900, fontSize: '0.72rem', color: badge.color }}>
+                                {badge.icon} {badge.label}
+                              </Typography>
+                              {oldestLot && (
+                                <Typography variant="caption" sx={{ color: badge.color, opacity: 0.85, display:'block', mt:0.2, fontSize: '0.68rem', fontWeight: 700 }}>
+                                  Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
+                                </Typography>
+                              )}
+                            </Box>
+                          )
                         )}
                         <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{t.brand} {t.model} {t.size}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t.vehicle_type} · {t.tire_category}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5, alignItems: 'center' }}>
                           <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{t.price} {currency}</Typography>
                           <Chip label={`Stock: ${t.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
                         </Box>
-                        {/* FIFO Age Badge */}
-                        {badge && (
-                          <Box sx={{ mt: 1.5, p: 1, borderRadius: 2, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
-                            <Typography sx={{ fontWeight: 900, fontSize: '0.72rem', color: badge.color }}>
-                              {badge.icon} {badge.label}
-                            </Typography>
-                            {oldestLot && (
-                              <Typography variant="caption" sx={{ color: badge.color, opacity: 0.85, display:'block', mt:0.2 }}>
-                                Oldest: {oldestLot.age_years} yrs old · {oldestLot.current_qty} units
-                                {oldestLot.dot_code ? ` · DOT ${oldestLot.dot_code}` : ''}
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
                         <Button
                           fullWidth size="small" variant="contained"
                           startIcon={<AddIcon />}

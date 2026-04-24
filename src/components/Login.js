@@ -273,9 +273,8 @@ const Login = () => {
                                 </Link>
                             </Box>
 
-                            <Typography variant="body2" sx={{ mt: 3, color: 'rgba(255, 255, 255, 0.4)' }}>
-                                Public registration is disabled. <br />
-                                Contact administrator to create an account.
+                            <Typography variant="body2" sx={{ mt: 3, color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.75rem' }}>
+                                Protected System. Internal Access Only.
                             </Typography>
                         </Box>
                     </GlassPaper>

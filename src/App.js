@@ -23,6 +23,8 @@ import {
   MenuItem,
   Fade,
   Button,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -137,6 +139,7 @@ const AppContent = () => {
   const [businessProfile, setBusinessProfile] = useState({ name: 'Dost Auto Tires', logo_url: '', currency: 'LKR' });
   const [masterData, setMasterData] = useState({ brands: [], vehicles: [], services: [] });
   const [billingDraft, setBillingDraft] = useState(null);
+  const [dataError, setDataError] = useState(null);
 
   // Sync selected component if permissions change
   useEffect(() => {
@@ -152,7 +155,12 @@ const AppContent = () => {
     const fetchData = async (table, setter) => {
       try {
         const { data, error } = await supabase.from(table).select('*');
-        if (!error && data) setter(data);
+        if (error) {
+          console.error(`[Data] Error fetching ${table}:`, error);
+          setDataError(`Database Error: Could not load ${table}. Check your connection or RLS policies.`);
+        } else if (data) {
+          setter(data);
+        }
       } catch (e) {
         console.warn(`[Data] Failed to fetch ${table}:`, e.message);
       }
@@ -207,7 +215,8 @@ const AppContent = () => {
     const tables = [
       'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
       'customers', 'appointments', 'invoices', 'workers',
-      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data', 'inventory_lots'
+      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data', 'inventory_lots',
+      'audit_log'
     ];
 
     const channels = tables.map(table => {
@@ -343,19 +352,21 @@ const AppContent = () => {
     []
   );
 
-  const recordAudit = async (action, notes = {}) => {
+  const recordAudit = async (action, notes = {}, tableName = 'System') => {
     try {
       await supabase.from('audit_log').insert([{
         action,
-        notes: JSON.stringify(notes),
-        record_id: notes.id || notes.brand || 'N/A'
+        table_name: tableName,
+        notes: typeof notes === 'object' ? JSON.stringify(notes) : notes,
+        record_id: notes.id || notes.brand || notes.reference_number || 'N/A',
+        user_id: user?.id
       }]);
     } catch (e) { console.warn("[Audit] Failed:", e.message); }
   };
 
   const addTire = async (tire) => {
     try {
-      const { data, error } = await supabase.from('tires').insert([{ ...tire }]).select();
+      const { error } = await supabase.from('tires').insert([{ ...tire }]).select();
       if (!error) recordAudit('Add Tire', { brand: tire.brand, size: tire.size });
     } catch (e) { console.error(e); }
   };
@@ -379,7 +390,13 @@ const AppContent = () => {
       const { data, error } = await supabase.rpc('process_sale', { sale_payload: invoice });
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
-      recordAudit('Process Sale', { customer: invoice.customer_name, total: invoice.total });
+      recordAudit('Process Sale', { 
+        customer: invoice.customer_name, 
+        vehicle: invoice.vehicle_number,
+        items: invoice.items.length,
+        total: invoice.total,
+        payment: invoice.payment_method
+      }, 'sales');
       return { success: true, data };
     } catch (e) {
       console.error("Error processing sale: ", e);
@@ -439,6 +456,20 @@ const AppContent = () => {
       console.error("Error processing return: ", e);
       return { success: false, error: e.message };
     }
+  };
+
+  const updateSupplier = async (supplierId, updatedData) => {
+    try {
+      const { error } = await supabase.from('suppliers').update(updatedData).eq('id', supplierId);
+      if (!error) recordAudit('Update Supplier', { id: supplierId, ...updatedData }, 'suppliers');
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteSupplier = async (supplierId) => {
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+      if (!error) recordAudit('Delete Supplier', { id: supplierId, name: suppliers.find(s => s.id === supplierId)?.name }, 'suppliers');
+    } catch (e) { console.error(e); }
   };
 
   const saveQuotation = async (quoteData) => {
@@ -501,10 +532,9 @@ const AppContent = () => {
         {menuItems
           .filter(item => !item.adminOnly || isAdmin)
           .map((item) => (
-            <Tooltip title={!open ? item.text : ""} placement="right">
+            <Tooltip key={item.text} title={!open ? item.text : ""} placement="right">
               <ListItem 
                 button 
-                key={item.text} 
                 onClick={() => { setSelectedComponent(item.component); if (isMobile) setOpen(false); }} 
                 selected={selectedComponent === item.component}
                 sx={{
@@ -592,7 +622,7 @@ const AppContent = () => {
         return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} {...commonProps} /> : posComponent;
       
       case "Suppliers":
-        return isAdmin ? <SupplierManagement suppliers={suppliers || []} {...commonProps} /> : posComponent;
+        return isAdmin ? <SupplierManagement suppliers={suppliers || []} updateSupplier={updateSupplier} deleteSupplier={deleteSupplier} {...commonProps} /> : posComponent;
 
       case "Settings": 
         return isAdmin ? <Settings {...commonProps} /> : posComponent;
@@ -735,6 +765,9 @@ const AppContent = () => {
             </Container>
           </Main>
         </Box>
+        <Snackbar open={!!dataError} autoHideDuration={6000} onClose={() => setDataError(null)}>
+          <Alert severity="error" variant="filled" sx={{ borderRadius: 3, fontWeight: 800 }}>{dataError}</Alert>
+        </Snackbar>
       </Router>
     </ThemeProvider>
   );

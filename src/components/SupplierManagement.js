@@ -14,13 +14,16 @@ import {
   History as HistoryIcon,
   Payments as PaymentsIcon,
   AccountBalance as BankIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Print as PrintIcon
 } from '@mui/icons-material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
-const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) => {
-  const { user } = useAuth();
+const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, updateSupplier, deleteSupplier }) => {
+  useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [openPayDialog, setOpenPayDialog] = useState(false);
@@ -51,7 +54,9 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
 
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [alert, setAlert] = useState({ open: false, message: '', severity: 'success' });
+  const [isEditing, setIsEditing] = useState(false);
 
   const currency = businessProfile?.currency || 'LKR';
 
@@ -170,29 +175,63 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
       setAlert({ open: true, message: 'Vendor name is required', severity: 'error' });
       return;
     }
+    setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('suppliers').insert([{
-        name: newVendor.name,
-        phone: newVendor.phone,
-        email: newVendor.email,
-        payable_balance: Number(newVendor.opening_balance || 0),
-        transactions: Number(newVendor.opening_balance) > 0 ? [{
-          id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          date: new Date().toISOString().split('T')[0],
-          type: 'Opening Balance',
-          amount: Number(newVendor.opening_balance),
-          description: 'Initial balance'
-        }] : []
-      }]);
-
-      if (error) throw error;
-      setAlert({ open: true, message: 'Vendor added successfully', severity: 'success' });
+      if (isEditing) {
+        await updateSupplier(selectedSupplier.id, {
+          name: newVendor.name,
+          phone: newVendor.phone,
+          email: newVendor.email
+        });
+        setAlert({ open: true, message: 'Vendor updated successfully', severity: 'success' });
+      } else {
+        const { error } = await supabase.from('suppliers').insert([{
+          name: newVendor.name,
+          phone: newVendor.phone,
+          email: newVendor.email,
+          payable_balance: Number(newVendor.opening_balance || 0),
+          transactions: Number(newVendor.opening_balance) > 0 ? [{
+            id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            date: new Date().toISOString().split('T')[0],
+            type: 'Opening Balance',
+            amount: Number(newVendor.opening_balance),
+            description: 'Initial balance'
+          }] : []
+        }]);
+        if (error) throw error;
+        setAlert({ open: true, message: 'Vendor added successfully', severity: 'success' });
+      }
       setOpenVendorDialog(false);
       setNewVendor({ name: '', phone: '', email: '', opening_balance: 0 });
-      recordAudit('Vendor Registered', { name: newVendor.name });
+      setIsEditing(false);
     } catch (e) {
       setAlert({ open: true, message: e.message, severity: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleDeleteVendor = async (supplierId) => {
+    if (window.confirm('Are you sure you want to delete this vendor? All their history will be lost.')) {
+      try {
+        await deleteSupplier(supplierId);
+        setAlert({ open: true, message: 'Vendor deleted successfully', severity: 'success' });
+      } catch (e) {
+        setAlert({ open: true, message: 'Error deleting vendor', severity: 'error' });
+      }
+    }
+  };
+
+  const handleEditVendor = (supplier) => {
+    setSelectedSupplier(supplier);
+    setNewVendor({
+      name: supplier.name,
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      opening_balance: 0 // Cannot edit opening balance once created
+    });
+    setIsEditing(true);
+    setOpenVendorDialog(true);
   };
 
   const handleSubmitPayment = async () => {
@@ -215,7 +254,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
       if (payErr) throw payErr;
 
       // 2. Update Supplier Balance & Ledger
-      const newBalance = Math.max(0, Number(selectedSupplier.payable_balance || 0) - Number(paymentData.amount));
+      const newBalance = Number(selectedSupplier.payable_balance || 0) - Number(paymentData.amount);
       const tx = {
         id: paymentRecord.id,
         date: paymentData.date,
@@ -244,6 +283,63 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
     }
   };
 
+  const handleDeleteTransaction = async (txId) => {
+    if (!window.confirm("Are you sure you want to delete this transaction? This will revert the balance.")) return;
+    
+    try {
+      const tx = selectedSupplier.transactions.find(t => t.id === txId);
+      if (!tx) return;
+
+      const newTransactions = selectedSupplier.transactions.filter(t => t.id !== txId);
+      
+      // Re-calculate balance
+      let newBalance = 0;
+      newTransactions.forEach(t => {
+        if (t.type.includes('Payment') || t.type === 'Stock Return') {
+          newBalance -= Number(t.amount || 0);
+        } else {
+          newBalance += Number(t.amount || 0);
+        }
+      });
+      
+      const { error } = await supabase
+        .from('suppliers')
+        .update({ 
+          transactions: newTransactions,
+          payable_balance: newBalance
+        })
+        .eq('id', selectedSupplier.id);
+
+      if (error) throw error;
+      
+      recordAudit('Delete Vendor Transaction', { 
+        supplier: selectedSupplier.name,
+        tx_type: tx.type,
+        tx_amount: tx.amount,
+        new_balance: newBalance
+      }, 'suppliers');
+
+      // Update local state
+      setSelectedSupplier({ ...selectedSupplier, transactions: newTransactions, payable_balance: newBalance });
+    } catch (err) {
+      alert("Failed to delete transaction: " + err.message);
+    }
+  };
+
+  const handlePrintStatement = () => {
+    const printContent = document.getElementById('vendor-ledger-table');
+    const win = window.open('', '', 'height=700,width=900');
+    win.document.write('<html><head><title>Vendor Statement</title>');
+    win.document.write('<style>table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>');
+    win.document.write('</head><body>');
+    win.document.write(`<h1>Vendor Statement: ${selectedSupplier.name}</h1>`);
+    win.document.write(`<p>Current Balance: ${selectedSupplier.payable_balance.toLocaleString()} ${currency}</p>`);
+    win.document.write(printContent.innerHTML);
+    win.document.write('</body></html>');
+    win.document.close();
+    win.print();
+  };
+
   return (
     <Box>
       {/* Header Section */}
@@ -269,15 +365,27 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
             <CardContent>
               <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Total Payables</Typography>
               <Typography variant="h3" sx={{ fontWeight: 900, color: 'error.main' }}>
-                {suppliers.reduce((s, x) => s + Number(x.payable_balance || 0), 0).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
+                {suppliers.reduce((s, x) => s + Math.max(0, Number(x.payable_balance || 0)), 0).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
               </Typography>
             </CardContent>
           </Card>
         </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card sx={{ borderRadius: 4, bgcolor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
+            <CardContent>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Advance Paid (Debits)</Typography>
+              <Typography variant="h3" sx={{ fontWeight: 900, color: 'success.main' }}>
+                {Math.abs(suppliers.reduce((s, x) => s + Math.min(0, Number(x.payable_balance || 0)), 0)).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
         <Grid item xs={12} md={4}>
           <Card sx={{ borderRadius: 4, bgcolor: 'rgba(26, 35, 126, 0.05)', border: '1px solid rgba(26, 35, 126, 0.1)' }}>
             <CardContent>
-              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Active Suppliers</Typography>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Total Suppliers</Typography>
               <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main' }}>
                 {suppliers.length}
               </Typography>
@@ -308,7 +416,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
             <TableRow>
               <TableCell sx={{ fontWeight: 900, py: 2.5 }}>VENDOR NAME</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>CONTACT INFO</TableCell>
-              <TableCell sx={{ fontWeight: 900 }}>OUTSTANDING BALANCE</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>BALANCE STATUS</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>LAST TRANSACTION</TableCell>
               <TableCell align="right" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
             </TableRow>
@@ -334,9 +442,10 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                     <Typography variant="caption" color="text.secondary">{sup.email || ''}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontWeight: 900, color: Number(sup.payable_balance) > 0 ? 'error.main' : 'success.main' }}>
-                      {Number(sup.payable_balance || 0).toLocaleString()} {currency}
+                    <Typography sx={{ fontWeight: 900, color: Number(sup.payable_balance) > 0 ? 'error.main' : (Number(sup.payable_balance) < 0 ? 'success.main' : 'text.secondary') }}>
+                      {Number(sup.payable_balance) < 0 ? `Advance: ${Math.abs(sup.payable_balance).toLocaleString()}` : `${Number(sup.payable_balance || 0).toLocaleString()}`} {currency}
                     </Typography>
+                    {Number(sup.payable_balance) < 0 && <Chip label="DEBIT BALANCE" size="small" color="success" sx={{ fontSize: '0.6rem', height: 16, fontWeight: 900 }} />}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
@@ -353,7 +462,6 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                         variant="contained" 
                         color="primary" 
                         onClick={() => handleOpenPay(sup)}
-                        disabled={Number(sup.payable_balance) <= 0}
                         sx={{ borderRadius: 2, fontWeight: 800 }}
                       >
                         PAY
@@ -366,6 +474,12 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                       >
                         LEDGER
                       </Button>
+                      <IconButton size="small" color="primary" onClick={() => handleEditVendor(sup)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDeleteVendor(sup.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -382,9 +496,13 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
         </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
-            <Box sx={{ p: 2, bgcolor: 'rgba(244, 67, 54, 0.05)', borderRadius: 2, border: '1px dashed rgba(244, 67, 54, 0.3)' }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: 'error.main', display: 'block' }}>OUTSTANDING BALANCE</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{Number(selectedSupplier?.payable_balance || 0).toLocaleString()} {currency}</Typography>
+            <Box sx={{ p: 2, bgcolor: Number(selectedSupplier?.payable_balance) >= 0 ? 'rgba(244, 67, 54, 0.05)' : 'rgba(76, 175, 80, 0.05)', borderRadius: 2, border: '1px dashed ' + (Number(selectedSupplier?.payable_balance) >= 0 ? 'rgba(244, 67, 54, 0.3)' : 'rgba(76, 175, 80, 0.3)') }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: Number(selectedSupplier?.payable_balance) >= 0 ? 'error.main' : 'success.main', display: 'block' }}>
+                {Number(selectedSupplier?.payable_balance) >= 0 ? 'OUTSTANDING BALANCE' : 'ADVANCE BALANCE'}
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: Number(selectedSupplier?.payable_balance) >= 0 ? 'error.main' : 'success.main' }}>
+                {Math.abs(Number(selectedSupplier?.payable_balance || 0)).toLocaleString()} {currency}
+              </Typography>
             </Box>
 
             <TextField
@@ -466,20 +584,37 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
         <DialogContent sx={{ p: 0 }}>
           <Box sx={{ p: 3, display: 'flex', gap: 2, bgcolor: 'rgba(26, 35, 126, 0.02)' }}>
              <Box sx={{ flex: 1, p: 2, bgcolor: '#fff', borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
-               <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>TOTAL PAYABLE</Typography>
-               <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{Number(selectedSupplier?.payable_balance || 0).toLocaleString()} {currency}</Typography>
-             </Box>
+                <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>{Number(selectedSupplier?.payable_balance) >= 0 ? 'TOTAL PAYABLE' : 'ADVANCE BALANCE'}</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: Number(selectedSupplier?.payable_balance) >= 0 ? 'error.main' : 'success.main' }}>{Math.abs(Number(selectedSupplier?.payable_balance || 0)).toLocaleString()} {currency}</Typography>
+              </Box>
              <Box sx={{ flex: 1, p: 2, bgcolor: '#fff', borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
                <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>TOTAL TRANSACTIONS</Typography>
                <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>{selectedSupplier?.transactions?.length || 0}</Typography>
              </Box>
+             <Button 
+              variant="outlined" 
+              startIcon={<PrintIcon />} 
+              onClick={handlePrintStatement}
+              sx={{ borderRadius: 3, fontWeight: 700 }}
+            >
+              PRINT STATEMENT
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="error"
+              startIcon={<DeleteIcon />} 
+              onClick={() => { if(window.confirm("Delete this entire vendor and all history?")) { handleDeleteVendor(selectedSupplier.id); setOpenLedgerDialog(false); } }}
+              sx={{ borderRadius: 3, fontWeight: 700 }}
+            >
+              DELETE VENDOR
+            </Button>
           </Box>
 
           <Box sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <HistoryIcon color="primary" /> Full Transaction History
             </Typography>
-            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+            <TableContainer id="vendor-ledger-table" component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
               <Table size="small">
                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                   <TableRow>
@@ -487,6 +622,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                     <TableCell sx={{ fontWeight: 900 }}>TYPE</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>DESCRIPTION</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -515,13 +651,18 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                           </Button>
                         )}
                       </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 900, color: t.type.includes('Payment') ? 'success.main' : 'error.main' }}>
-                        {t.type.includes('Payment') ? '-' : '+'}{Number(t.amount || 0).toLocaleString()} {currency}
+                      <TableCell align="right" sx={{ fontWeight: 900, color: (t.type.includes('Payment') || t.type === 'Stock Return') ? 'success.main' : 'error.main' }}>
+                        {(t.type.includes('Payment') || t.type === 'Stock Return') ? '-' : '+'}{Number(t.amount || 0).toLocaleString()} {currency}
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton size="small" color="error" onClick={() => handleDeleteTransaction(t.id)}>
+                          <DeleteIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
                   {(!selectedSupplier?.transactions || selectedSupplier.transactions.length === 0) && (
-                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}>No transactions recorded.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}>No transactions recorded.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -571,8 +712,8 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
       </Dialog>
 
       {/* New Vendor Dialog */}
-      <Dialog open={openVendorDialog} onClose={() => setOpenVendorDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Register New Vendor</DialogTitle>
+      <Dialog open={openVendorDialog} onClose={() => { setOpenVendorDialog(false); setIsEditing(false); }} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>{isEditing ? 'Edit Vendor' : 'Register New Vendor'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
             <TextField
@@ -607,12 +748,20 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit }) =>
                 sx: { borderRadius: 3 }
               }}
               helperText="Add any amount you currently owe this vendor"
+              disabled={isEditing}
             />
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setOpenVendorDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddVendor} sx={{ borderRadius: 3, fontWeight: 900, px: 3 }}>SAVE VENDOR</Button>
+          <Button onClick={() => { setOpenVendorDialog(false); setIsEditing(false); }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleAddVendor} 
+            disabled={isSubmitting}
+            sx={{ borderRadius: 3, fontWeight: 900, px: 3 }}
+          >
+            {isSubmitting ? 'SAVING...' : (isEditing ? 'UPDATE VENDOR' : 'SAVE VENDOR')}
+          </Button>
         </DialogActions>
       </Dialog>
 

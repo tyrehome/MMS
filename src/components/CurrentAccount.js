@@ -15,7 +15,8 @@ import {
   PictureAsPdf as PictureAsPdfIcon,
   AccountBalance as BankIcon,
   History as HistoryIcon,
-  Lock as LockIcon
+  Lock as LockIcon,
+  Delete as DeleteIcon
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
@@ -129,6 +130,69 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
     } catch (err) {
       console.error('Transaction error:', err);
       setSnackbar({ open: true, message: "Failed to post transaction", severity: "error" });
+    }
+  };
+
+  const handleDeleteAccount = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently close/delete this ledger? All history will be lost.")) return;
+    try {
+      const { error } = await supabase.from("accounts").delete().eq('id', id);
+      if (error) throw error;
+      setAccounts(accounts.filter(a => a.id !== id));
+      setSnackbar({ open: true, message: "Ledger closed and deleted successfully", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, message: `Error: ${err.message}`, severity: "error" });
+    }
+  };
+
+  const handleDeleteTransaction = async (accId, txId) => {
+    if (!window.confirm("Delete this transaction? The balance will be reverted.")) return;
+    
+    try {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+
+      const tx = acc.transactions.find(t => t.id === txId);
+      if (!tx) return;
+
+      const newTransactions = acc.transactions.filter(t => t.id !== txId);
+      
+      // Re-calculate balances
+      let newReceivable = 0;
+      let newPayable = 0;
+      
+      newTransactions.forEach(t => {
+        if (t.type === 'Payment Received') {
+          newReceivable -= t.amount;
+        } else if (t.type === 'Credit Charge') {
+          newReceivable += t.amount;
+        } else if (t.type === 'Payment Made') {
+          newPayable -= t.amount;
+        } else if (t.type === 'Credit Purchase') {
+          newPayable += t.amount;
+        }
+      });
+
+      const { error } = await supabase.from("accounts").update({
+        transactions: newTransactions,
+        receivable: Math.max(0, newReceivable),
+        payable: Math.max(0, newPayable)
+      }).eq('id', accId);
+
+      if (error) throw error;
+      
+      // Refresh local state
+      const { data: freshAccounts } = await supabase.from('accounts').select('*');
+      if (freshAccounts) setAccounts(freshAccounts);
+      
+      // If statement is open, update the selected account
+      if (selectedAccountForStatement?.id === accId) {
+        setSelectedAccountForStatement(freshAccounts.find(a => a.id === accId));
+      }
+
+      setSnackbar({ open: true, message: "Transaction deleted and balance reverted", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, message: `Error: ${err.message}`, severity: "error" });
     }
   };
 
@@ -371,11 +435,12 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
                   <TableCell sx={{ fontWeight: 900 }}>TYPE</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>DESCRIPTION</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 900 }}>AMOUNT</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900 }}>ACTION</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {(!selectedAccountForStatement?.transactions || selectedAccountForStatement.transactions.length === 0) ? (
-                  <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4, opacity: 0.6 }}>No transaction history found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4, opacity: 0.6 }}>No transaction history found</TableCell></TableRow>
                 ) : (
                   [...selectedAccountForStatement.transactions].reverse().map((t, i) => (
                     <TableRow key={i} hover>
@@ -383,6 +448,11 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
                       <TableCell><Chip label={t.type} size="small" variant="outlined" sx={{ fontWeight: 700 }} /></TableCell>
                       <TableCell>{t.description}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 800 }}>{t.amount?.toLocaleString()} {currency}</TableCell>
+                      <TableCell align="center">
+                        <IconButton size="small" color="error" onClick={() => handleDeleteTransaction(selectedAccountForStatement.id, t.id)}>
+                          <DeleteIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -396,10 +466,10 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
       </Dialog>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        {isAdmin && <MenuItem onClick={() => { setOpenTransactionDialog(true); setAnchorEl(null); }}>Post Manual Transaction</MenuItem>}
+        {isAdmin && <MenuItem onClick={() => { setOpenTransactionDialog(true); setAnchorEl(null); }}>Record Payment / Adjustment</MenuItem>}
         <MenuItem onClick={() => { handleOpenStatement(selectedAccountId); setAnchorEl(null); }}>View Statement</MenuItem>
         {isAdmin && <Divider />}
-        {isAdmin && <MenuItem onClick={() => { setAnchorEl(null); }} sx={{ color: 'error.main' }}>Close Ledger</MenuItem>}
+        {isAdmin && <MenuItem onClick={() => { handleDeleteAccount(selectedAccountId); setAnchorEl(null); }} sx={{ color: 'error.main' }}>Close & Delete Ledger</MenuItem>}
       </Menu>
 
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>

@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
 
 CREATE TABLE IF NOT EXISTS public.suppliers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     phone TEXT,
     email TEXT,
     payable_balance NUMERIC DEFAULT 0,
@@ -490,7 +490,7 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
     table_name TEXT,
     record_id TEXT,
     notes TEXT,
-    user_id UUID REFERENCES auth.users(id)
+    user_id UUID REFERENCES public.profiles(id)
 );
 
 -- GRN (Goods Received Note) Tracking
@@ -661,31 +661,22 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Everyone can see profiles
-CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
+DO $$ BEGIN
+    CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Users can update their OWN profile
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+DO $$ BEGIN
+    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Admins have full access to all profiles (Using the safe function)
-CREATE POLICY "Admins have full access" ON public.profiles FOR ALL USING (public.is_admin());
+DO $$ BEGIN
+    CREATE POLICY "Admins have full access" ON public.profiles FOR ALL USING (public.is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Note: We enable full access to all authenticated users for operational tables.
-DO $$
-DECLARE
-    t text;
-BEGIN
-    FOR t IN 
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_type = 'BASE TABLE'
-        AND table_name != 'profiles'
-    LOOP
-        BEGIN
-            EXECUTE format('CREATE POLICY "Allow authenticated users" ON public.%I FOR ALL TO authenticated USING (true);', t);
-        EXCEPTION WHEN duplicate_object THEN
-            NULL;
-        END;
-    END LOOP;
-END $$;
+
 
 -- ==========================================
 -- AUTOMATION (TRIGGERS)
@@ -1007,24 +998,38 @@ ALTER TABLE public.suppliers REPLICA IDENTITY FULL;
 ALTER TABLE public.accounts REPLICA IDENTITY FULL;
 
 -- ==========================================
--- STORAGE CONFIGURATION
+-- Storage configuration removed because it is handled by setup-supabase.mjs
+
 -- ==========================================
--- These policies ensure your buckets exist and are protected
--- Note: Run these in the Supabase SQL editor to ensure buckets are initialized.
+-- FINAL RLS SETUP (FOR ALL TABLES)
+-- ==========================================
+DO $$
+DECLARE
+    t text;
+BEGIN
+    FOR t IN 
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        AND table_name != 'profiles'
+    LOOP
+        -- Enable RLS
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
+        
+        -- Create permissive policy for authenticated users
+        BEGIN
+            EXECUTE format('CREATE POLICY "Allow authenticated users" ON public.%I FOR ALL TO authenticated USING (true);', t);
+        EXCEPTION WHEN duplicate_object THEN
+            NULL;
+        END;
 
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('tires', 'tires', true)
-ON CONFLICT (id) DO NOTHING;
+        -- Add to Realtime Publication
+        BEGIN
+            EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I;', t);
+        EXCEPTION WHEN OTHERS THEN
+            NULL; -- Table might already be in publication
+        END;
+    END LOOP;
+END $$;
 
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('logos', 'logos', true)
-ON CONFLICT (id) DO NOTHING;
-
--- Storage Policies for 'tires' bucket
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'tires');
-CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'tires' AND auth.role() = 'authenticated');
-CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE USING (bucket_id = 'tires' AND auth.role() = 'authenticated');
-
--- Storage Policies for 'logos' bucket
-CREATE POLICY "Public Logo Access" ON storage.objects FOR SELECT USING (bucket_id = 'logos');
-CREATE POLICY "Authenticated Logo Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'logos' AND auth.role() = 'authenticated');

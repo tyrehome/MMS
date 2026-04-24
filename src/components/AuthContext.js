@@ -1,251 +1,98 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
-
 export const useAuth = () => useContext(AuthContext);
-
-// How long (ms) to wait for the profiles DB call before giving up and defaulting to 'staff'
-const ROLE_FETCH_TIMEOUT_MS = 8000;
-
-// Hard global fallback: if loading is STILL true after this many ms, force it false
-// so the user is never permanently blocked
-const GLOBAL_LOADING_TIMEOUT_MS = 10000;
 
 const ROLE_CACHE_KEY = 'sb-user-role';
 
-/**
- * Fetch role from the profiles table with a race-based timeout.
- */
-const fetchRoleWithTimeout = async (uid) => {
-    const fetchPromise = supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', uid)
-        .maybeSingle();
-
-    const timeoutPromise = new Promise((resolve) =>
-        setTimeout(() => resolve({ data: null, error: new Error('timeout') }), ROLE_FETCH_TIMEOUT_MS)
-    );
-
-    try {
-        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-        if (error) {
-            console.warn('[Auth] Role fetch error/timeout, using fallback staff');
-            return 'staff';
-        }
-
-        if (!data) {
-            console.warn(`[Auth] No profile row found for UID: ${uid}. Defaulting to staff.`);
-            return 'staff';
-        }
-
-        const normalizedRole = (data.role || 'staff').toLowerCase().trim();
-        // Cache the role for next load
-        localStorage.setItem(ROLE_CACHE_KEY, normalizedRole);
-        return normalizedRole;
-    } catch (err) {
-        console.warn('[Auth] Unexpected error in fetchRole:', err);
-        return 'staff';
-    }
-};
-
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [role, setRole] = useState(null);
+    const [role, setRole] = useState(localStorage.getItem(ROLE_CACHE_KEY) || 'staff');
     const [loading, setLoading] = useState(true);
+    const userRef = useRef(null);
+
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     useEffect(() => {
         let mounted = true;
 
         const handleAuth = async (session) => {
             if (!mounted) return;
-            
             const currentUser = session?.user || null;
-            // Support multiple owner/bypass emails for Sewwa
-            const ownerEmails = [
-                'sewwasofficial@gmail.com',
-                'sewwas@gmail.com',
-                'sewwa.mms@gmail.com',
-                'sewwa.tms@gmail.com',
-                'mmstyrehome@gmail.com'
-            ];
-            
+
             if (currentUser) {
-                const userEmail = (currentUser.email || '').toLowerCase().trim();
-                const isOwner = ownerEmails.some(email => userEmail === email);
-
-                // Check for role in app_metadata (synced via DB trigger)
-                const metadataRole = currentUser.app_metadata?.role;
-
-                // LAYER 1: Immediate Bypass for Owner OR metadata claim
-                if (isOwner || metadataRole) {
-                    const finalRole = isOwner ? 'admin' : (metadataRole || 'staff');
-                    console.info(`[Auth] role resolved via ${isOwner ? 'Owner Bypass' : 'JWT Metadata'}:`, finalRole);
-                    setUser(currentUser);
-                    setRole(finalRole);
-                    setLoading(false);
-                    
-                    // Background repair to ensure profiles table is in sync
-                    (async () => {
-                        try {
-                            const { data: profile } = await supabase.from('profiles').select('id, role').eq('id', currentUser.id).maybeSingle();
-                            if (!profile || profile.role !== finalRole) {
-                                await supabase.from('profiles').upsert({
-                                    id: currentUser.id,
-                                    email: userEmail,
-                                    role: finalRole,
-                                    name: profile?.name || userEmail.split('@')[0].toUpperCase()
-                                });
-                            }
-                            localStorage.setItem(ROLE_CACHE_KEY, finalRole);
-                        } catch (e) {
-                            console.warn('[Auth] Background sync failed (non-critical):', e.message);
-                        }
-                    })();
-
-                    // Only return early for Owners. Others proceed to LAYER 3 to verify against DB.
-                    if (isOwner) return;
-                }
-
-                // LAYER 2: Optimistic UI for others via Cache
-                const cachedRole = localStorage.getItem(ROLE_CACHE_KEY);
-                if (cachedRole && mounted) {
-                    setUser(currentUser);
-                    setRole(cachedRole);
-                    setLoading(false);
-                }
-
-                // LAYER 3: Fresh Fetch for non-owners
-                const userRole = await fetchRoleWithTimeout(currentUser.id);
+                // 1. Get role from JWT metadata (Instant)
+                let userRole = currentUser.app_metadata?.role || currentUser.user_metadata?.role || 'staff';
                 
                 if (mounted) {
-                    // Only update if it actually changed or if we are still loading
                     setUser(currentUser);
                     setRole(userRole);
                     setLoading(false);
-                    // Update cache with the definitive role
                     localStorage.setItem(ROLE_CACHE_KEY, userRole);
+                }
+
+                // 2. Refresh role from DB (Background)
+                // We use a very simple query to avoid potential hangs
+                try {
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', currentUser.id);
+                    
+                    if (mounted && !error && data && data.length > 0) {
+                        const dbRole = data[0].role;
+                        if (dbRole && dbRole !== userRole) {
+                            setRole(dbRole);
+                            localStorage.setItem(ROLE_CACHE_KEY, dbRole);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore DB errors in background
                 }
             } else {
                 if (mounted) {
-                    localStorage.removeItem(ROLE_CACHE_KEY);
                     setUser(null);
-                    setRole(null);
+                    setRole('staff');
                     setLoading(false);
+                    localStorage.removeItem(ROLE_CACHE_KEY);
                 }
             }
         };
 
-        const initAuth = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                await handleAuth(session);
-            } catch (err) {
-                console.error('[Auth] initAuth failed:', err);
-                if (mounted) setLoading(false);
-            }
-        };
+        // Standard listener handles both initial load and changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            handleAuth(session);
+        });
 
-        initAuth();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                if (!mounted) return;
-                
-                // On sign in or refresh, re-run core logic
-                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                    await handleAuth(session);
-                }
-
-                if (event === 'SIGNED_OUT') {
-                    localStorage.removeItem(ROLE_CACHE_KEY);
-                    setUser(null);
-                    setRole(null);
-                    setLoading(false);
-                }
-            }
-        );
-
-        // Global hard-timeout safety net (10 seconds)
-        const globalTimeout = setTimeout(() => {
-            if (mounted && loading) {
-                console.warn('[Auth] Global safety timeout reached — unlocking UI');
-                setLoading(false);
-            }
-        }, GLOBAL_LOADING_TIMEOUT_MS);
+        // Fail-safe
+        const timer = setTimeout(() => {
+            if (mounted) setLoading(false);
+        }, 5000);
 
         return () => {
             mounted = false;
             subscription?.unsubscribe();
-            clearTimeout(globalTimeout);
+            clearTimeout(timer);
         };
-    }, [loading]);
+    }, []);
 
     const logout = async () => {
-        try {
-            await supabase.auth.signOut();
-        } catch (err) {
-            console.error('[Auth] Logout error:', err);
-        } finally {
-            // Always clear local state regardless of server response
-            setUser(null);
-            setRole(null);
-            // Hard reload ensures all component state is fully cleared
-            window.location.reload();
-        }
-    };
-
-    const value = {
-        user,
-        role,
-        isAdmin: role === 'admin',
-        loading,
-        logout,
+        await supabase.auth.signOut();
+        localStorage.removeItem(ROLE_CACHE_KEY);
+        window.location.reload();
     };
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={{ user, role, isAdmin: role?.toLowerCase() === 'admin', loading, logout }}>
             {loading ? (
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100vh',
-                    background: 'linear-gradient(135deg, #f8fafd 0%, #eef2ff 100%)',
-                    gap: 20,
-                }}>
-                    <div style={{
-                        width: 48,
-                        height: 48,
-                        border: '4px solid #e8eaf6',
-                        borderTop: '4px solid #1a237e',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                    }} />
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#020617' }}>
+                    <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTop: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <div style={{
-                        fontFamily: 'Outfit, Inter, sans-serif',
-                        color: '#1a237e',
-                        fontWeight: 700,
-                        fontSize: 16,
-                        letterSpacing: '-0.3px',
-                    }}>
-                        Loading Application...
-                    </div>
-                    <div style={{
-                        fontFamily: 'Outfit, Inter, sans-serif',
-                        color: '#94a3b8',
-                        fontSize: 12,
-                    }}>
-                        Verifying session
-                    </div>
                 </div>
-            ) : (
-                children
-            )}
+            ) : children}
         </AuthContext.Provider>
     );
 };
