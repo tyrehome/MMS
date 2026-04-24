@@ -648,14 +648,24 @@ CREATE INDEX IF NOT EXISTS idx_tasks_worker ON public.tasks(worker_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON public.sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_log(created_at DESC);
 
+-- 1. Create a Security Definer function to check admin status
+-- This bypasses RLS for the check itself, preventing recursion
+CREATE OR REPLACE FUNCTION public.is_admin() 
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = auth.uid() AND role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Everyone can see profiles
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
 -- Users can update their OWN profile
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
--- Admins have full access to all profiles
-CREATE POLICY "Admins have full access" ON public.profiles FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
+-- Admins have full access to all profiles (Using the safe function)
+CREATE POLICY "Admins have full access" ON public.profiles FOR ALL USING (public.is_admin());
 
 -- Note: We enable full access to all authenticated users for operational tables.
 DO $$
