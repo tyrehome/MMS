@@ -84,8 +84,6 @@ const TireList = ({
     name:'',category:'Consumable',customCategory:'',
     stock:'',cost_price:'',price:'',supplier_id:'',notes:'',
   });
-  const [partSaving, setPartSaving] = useState(false);
-  
   /* ── Bulk GRN state ── */
   const [grnItems, setGrnItems] = useState([]); // Array of tires/parts for bulk submission
   const [grnReference, setGrnReference] = useState('');
