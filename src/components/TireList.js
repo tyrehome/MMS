@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import {
-  TextField, Typography, Snackbar, Button, Box, Grid, Select,
+  TextField, Typography, Button, Box, Grid, Select,
   MenuItem, FormControl, InputLabel, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Divider, Autocomplete,
   Avatar, Card, Tab, Tabs, Alert, IconButton, ToggleButton,
   ToggleButtonGroup, Checkbox, Dialog, DialogTitle, DialogContent,
-  DialogActions, Tooltip, Badge, LinearProgress, Paper, useMediaQuery
+  DialogActions, Tooltip, Badge, LinearProgress, Paper, useMediaQuery,
+  Snackbar
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -121,12 +122,9 @@ const TireList = ({
   };
 
   const dotPreview = parseDotCode(grnData.dot_code);
-  const dotAgeYears = dotPreview
-    ? ((Date.now() - dotPreview.getTime()) / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1)
-    : null;
 
   /* â”€â”€ Age helpers for inventory table â”€â”€ */
-  const getOldestLotForTire = (tireId) => {
+  const getOldestLotForTire = useCallback((tireId) => {
     const lots = lotAging.filter(l => l.tire_id === tireId);
     if (!lots.length) return null;
     return lots.reduce((oldest, l) => {
@@ -135,7 +133,7 @@ const TireList = ({
       if (!oldest.manufacture_date) return l;
       return new Date(l.manufacture_date) < new Date(oldest.manufacture_date) ? l : oldest;
     }, null);
-  };
+  }, [lotAging]);
 
   const ageStatusColor = (status) => {
     if (status === 'Expired')      return { bg: '#ffebee', color: '#c62828', icon: 'ðŸ”´' };
@@ -401,7 +399,7 @@ const TireList = ({
         if (sortBy === 'price') return a.price - b.price;
         return a.name.localeCompare(b.name);
       });
-  }, [allInventory, inventoryView, stockFilter, threshold, searchTerm, sortBy]);
+  }, [allInventory, inventoryView, stockFilter, threshold, searchTerm, sortBy, getOldestLotForTire]);
 
   /* â”€â”€â”€ Stats â”€â”€â”€ */
   const stats = useMemo(() => {
@@ -702,7 +700,6 @@ const TireList = ({
               {filteredInventory.map((item) => {
                 const margin = item.price > 0 ? (((item.price - item.cost_price) / item.price) * 100) : 0;
                 const inOrder = isInOrder(item);
-                const sc = stockColor(item.stock, threshold);
                 
                 return (
                   <Grid item xs={12} sm={6} key={`${item.type}-${item.id}`}>
@@ -1685,6 +1682,11 @@ const TireList = ({
           </Grid>
         </Grid>
       )}
+      <Snackbar open={alert.open} autoHideDuration={4000} onClose={() => setAlert({ ...alert, open: false })}>
+        <Alert severity={alert.severity} variant="filled" sx={{ borderRadius: 3, fontWeight: 800 }}>
+          {alert.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

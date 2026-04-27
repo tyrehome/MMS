@@ -818,7 +818,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                                 const tire = tires.find(t => t.id === item.tire_id);
                                 if (!tire) return 'Unknown Tire';
                                 const oldestLot = getOldestLot(tire.id);
-                                const expiredUnits = getExpiredUnitsForTire(tire.id);
+
                                 const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
                                 return (
                                   <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
