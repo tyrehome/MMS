@@ -22,7 +22,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { Snackbar, Alert } from '@mui/material';
 
-const ReportsHub = ({ tires = [], sales = [], accounts = [], businessProfile, recordAudit }) => {
+const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], parts = [], businessProfile, recordAudit }) => {
     const { isAdmin } = useAuth();
     const isMobile = useMediaQuery('(max-width:600px)');
     const [tabValue, setTabValue] = useState(0);
