@@ -212,43 +212,34 @@ const AppContent = () => {
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
-    const tables = [
-      'tires', 'sales', 'hotel_tires', 'accounts', 'parts',
-      'customers', 'appointments', 'invoices', 'workers',
-      'tasks', 'vehicles', 'suppliers', 'business_settings', 'master_data', 'inventory_lots',
-      'audit_log'
-    ];
-
-    const channels = tables.map(table => {
-      return supabase.channel(`public:${table}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
-          console.log(`[Realtime] Change detected in ${table}:`, payload);
-          // Optimized Refresh logic
-          if (table === 'master_data') fetchMasterData();
-          else if (table === 'business_settings') fetchBusinessSettings();
-          else if (table === 'sales') fetchSales();
-          else {
-            // Generic setter handler
-            const setters = {
-              tires: setTires, hotel_tires: setHotelTires,
-              accounts: setAccounts, parts: setParts, customers: setCustomers,
-              appointments: setAppointments, invoices: setInvoices,
-              workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
-              suppliers: setSuppliers, inventory_lots: setInventoryLots
-            };
-            if (setters[table]) {
-              // Instead of full refetch, we could apply the delta, 
-              // but for now, full refetch is safer and we only do it on changes.
-              fetchData(table, setters[table]);
-            }
+    const channel = supabase.channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        const table = payload.table;
+        console.log(`[Realtime] Change detected in ${table}:`, payload);
+        
+        if (table === 'master_data') fetchMasterData();
+        else if (table === 'business_settings') fetchBusinessSettings();
+        else if (table === 'sales') fetchSales();
+        else {
+          const setters = {
+            tires: setTires, hotel_tires: setHotelTires,
+            accounts: setAccounts, parts: setParts, customers: setCustomers,
+            appointments: setAppointments, invoices: setInvoices,
+            workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
+            suppliers: setSuppliers, inventory_lots: setInventoryLots
+          };
+          if (setters[table]) {
+            fetchData(table, setters[table]);
           }
-        })
-        .subscribe();
-    });
+        }
+      })
+      .subscribe((status) => {
+        console.log(`[Realtime] Subscription status: ${status}`);
+      });
 
     return () => {
       clearTimeout(secondaryTimer);
-      channels.forEach(ch => supabase.removeChannel(ch));
+      supabase.removeChannel(channel);
     };
   }, [user]);
 

@@ -24,6 +24,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
   const [currentWorker, setCurrentWorker] = useState(null);
   const [editingWorker, setEditingWorker] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  const [loading, setLoading] = useState(false);
 
   const [workerFormData, setWorkerFormData] = useState({ name: '', role: '', phone: '' });
   const [taskFormData, setTaskFormData] = useState({ 
@@ -42,30 +43,57 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
   useEffect(() => { setTasks(tasksList); }, [tasksList]);
 
   const handleWorkerSubmit = async () => {
-    if (editingWorker) await supabase.from('workers').update(workerFormData).eq('id', editingWorker.id);
-    else await supabase.from('workers').insert([workerFormData]);
-    setIsWorkerModalOpen(false);
-    setSnackbar({ open: true, message: 'Registry synchronized' });
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (editingWorker) await supabase.from('workers').update(workerFormData).eq('id', editingWorker.id);
+      else await supabase.from('workers').insert([workerFormData]);
+      setIsWorkerModalOpen(false);
+      setSnackbar({ open: true, message: 'Registry synchronized' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Sync failed: ' + err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleTaskSubmit = async () => {
-    const newTask = { 
+    if (loading || !currentWorker) return;
+    setLoading(true);
+    
+    const newTaskData = { 
       ...taskFormData, 
       worker_id: currentWorker.id, 
       status: 'In Progress' 
     };
-    await supabase.from('tasks').insert([newTask]);
-    setIsTaskModalOpen(false);
-    setTaskFormData({ 
-      task: 'Installation', 
-      details: '', 
-      customer_name: '', 
-      vehicle_number: '',
-      price: '',
-      date: format(new Date(), 'yyyy-MM-dd'), 
-      time: format(new Date(), 'HH:mm') 
-    });
-    setSnackbar({ open: true, message: 'Deployment authorized' });
+
+    try {
+      const { data, error } = await supabase.from('tasks').insert([newTaskData]).select();
+      if (error) throw error;
+      
+      // Optimistic update
+      if (data && data[0]) {
+        setTasks(prev => [data[0], ...prev]);
+      }
+
+      setIsTaskModalOpen(false);
+      setTaskFormData({ 
+        task: 'Installation', 
+        details: '', 
+        customer_name: '', 
+        vehicle_number: '',
+        price: '',
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        time: format(new Date(), 'HH:mm'),
+        priority: 'Standard'
+      });
+      setSnackbar({ open: true, message: 'Deployment authorized' });
+    } catch (err) {
+      console.error("Task deployment failed:", err);
+      setSnackbar({ open: true, message: 'Deployment failed: ' + err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const completeTask = async (id) => {
@@ -279,7 +307,9 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
           <TextField fullWidth label="Full Name" variant="standard" value={workerFormData.name} onChange={e => setWorkerFormData({...workerFormData, name: e.target.value})} />
           <TextField fullWidth label="Designated Role" variant="standard" value={workerFormData.role} onChange={e => setWorkerFormData({...workerFormData, role: e.target.value})} />
-          <Button variant="contained" fullWidth size="large" onClick={handleWorkerSubmit} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>SYNC PORTAL</Button>
+          <Button variant="contained" fullWidth size="large" onClick={handleWorkerSubmit} disabled={loading} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>
+            {loading ? 'SYNCING...' : 'SYNC PORTAL'}
+          </Button>
         </DialogContent>
       </Dialog>
 
@@ -306,7 +336,9 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                 </Select>
             </FormControl>
             <TextField fullWidth sx={{ mt: 1 }} multiline rows={3} label="Technical Details" value={taskFormData.details} onChange={e => setTaskFormData({...taskFormData, details: e.target.value})} />
-            <Button variant="contained" fullWidth size="large" onClick={handleTaskSubmit} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>AUTHORIZE DEPLOYMENT</Button>
+            <Button variant="contained" fullWidth size="large" onClick={handleTaskSubmit} disabled={loading} sx={{ borderRadius: 3, py: 2, fontWeight: 900 }}>
+                {loading ? 'DEPLOYING...' : 'AUTHORIZE DEPLOYMENT'}
+            </Button>
         </DialogContent>
       </Dialog>
 

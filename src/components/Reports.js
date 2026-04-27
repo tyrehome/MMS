@@ -14,7 +14,6 @@ import { useAuth } from './AuthContext';
 import CurrentAccount from './CurrentAccount';
 import { supabase } from '../supabaseClient';
 import {
-    Timeline as AnalyticsIcon,
     Search as SearchIcon,
     ExpandMore as ExpandMoreIcon,
     ExpandLess as ExpandLessIcon,
