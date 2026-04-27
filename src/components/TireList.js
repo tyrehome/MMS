@@ -6,7 +6,7 @@ import {
   TableContainer, TableHead, TableRow, Chip, Divider, Autocomplete,
   Avatar, Card, Tab, Tabs, Alert, IconButton, ToggleButton,
   ToggleButtonGroup, Checkbox, Dialog, DialogTitle, DialogContent,
-  DialogActions, Tooltip, Badge, LinearProgress, Paper
+  DialogActions, Tooltip, Badge, LinearProgress, Paper, useMediaQuery
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -43,6 +43,7 @@ const TireList = ({
   addBulkGRN, processStockReturn
 }) => {
   const { isAdmin } = useAuth();
+  const isMobile = useMediaQuery('(max-width:600px)');
   const [activeTab, setActiveTab]       = useState('stock');
   const [grnType,   setGrnType]         = useState('tire');
   const [searchTerm, setSearchTerm]     = useState('');
@@ -542,8 +543,11 @@ const TireList = ({
       </Box>
 
       <Tabs
-        value={activeTab} onChange={(e,v) => setActiveTab(v)}
-        sx={{ mb:4, '& .MuiTabs-indicator':{ height:3, borderRadius:1.5 }, '& .MuiTab-root':{ fontWeight:800, fontSize:'0.9rem', textTransform:'none' } }}
+        value={activeTab} 
+        onChange={(e,v) => setActiveTab(v)}
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
+        sx={{ mb:4, '& .MuiTabs-indicator':{ height:3, borderRadius:1.5 }, '& .MuiTab-root':{ fontWeight:800, fontSize: isMobile ? '0.85rem' : '0.9rem', textTransform:'none' } }}
       >
         <Tab icon={<StockIcon />} iconPosition="start" label="Stock Management" value="stock" />
         {isAdmin && <Tab icon={<GRNIcon />} iconPosition="start" label="Log GRN" value="grn" />}
@@ -578,8 +582,8 @@ const TireList = ({
           </Grid>
 
           {/* Filter Bar */}
-          <Card sx={{ borderRadius:4, p:3, mb:3 }}>
-            <Grid container spacing={2} alignItems="center">
+          <Card sx={{ borderRadius:4, p: isMobile ? 2 : 3, mb: 3 }}>
+            <Grid container spacing={isMobile ? 1.5 : 2} alignItems="center">
               {/* Search */}
               <Grid item xs={12} md={3}>
                 <TextField
@@ -590,7 +594,7 @@ const TireList = ({
               </Grid>
 
               {/* View: Tires / Parts / All */}
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} sm={6} md={3}>
                 <ToggleButtonGroup value={inventoryView} exclusive onChange={(_,v)=>v&&setInventoryView(v)} size="small" fullWidth>
                   {[['tires','Tires'],['parts','Parts'],['all','All']].map(([val,lbl])=>(
                     <ToggleButton key={val} value={val} sx={{ fontWeight:800, textTransform:'none', fontSize:'0.8rem' }}>{lbl}</ToggleButton>
@@ -599,7 +603,7 @@ const TireList = ({
               </Grid>
 
               {/* Stock filter */}
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} sm={6} md={3}>
                 <ToggleButtonGroup value={stockFilter} exclusive onChange={(_,v)=>v&&setStockFilter(v)} size="small" fullWidth>
                   {[['all','All'],['low','Low'],['out','Out']].map(([val,lbl])=>(
                     <ToggleButton key={val} value={val}
@@ -667,10 +671,10 @@ const TireList = ({
 
           {/* Main Table */}
           <Card sx={{ borderRadius:4, overflow:'hidden' }}>
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table>
                 <TableHead sx={{ bgcolor:'rgba(26,35,126,0.03)' }}>
-                  <TableRow>
+                  <TableRow sx={{ '& th': { whiteSpace: 'nowrap' } }}>
                     <TableCell padding="checkbox" />
                     <TableCell sx={{ fontWeight:900, py:2.5 }}>ITEM</TableCell>
                     <TableCell sx={{ fontWeight:900 }}>TYPE / CAT</TableCell>
@@ -1251,7 +1255,14 @@ const TireList = ({
       {activeTab === 'hotel' && <TireHotel hotelTiresProps={hotelTires} businessProfile={businessProfile} />}
 
       {/* ════ PURCHASE ORDER DIALOG ════ */}
-      <Dialog open={isPOOpen} onClose={()=>setIsPOOpen(false)} maxWidth="md" fullWidth PaperProps={{sx:{borderRadius:4}}}>
+      <Dialog 
+        open={isPOOpen} 
+        onClose={()=>setIsPOOpen(false)} 
+        maxWidth="md" 
+        fullWidth 
+        fullScreen={isMobile}
+        PaperProps={{sx:{borderRadius: isMobile ? 0 : 4}}}
+      >
         <DialogTitle sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid rgba(0,0,0,0.08)', pb:2 }}>
           <Box sx={{ display:'flex', alignItems:'center', gap:1.5 }}>
             <POIcon color="primary" />

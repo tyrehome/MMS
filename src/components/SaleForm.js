@@ -4,7 +4,7 @@ import {
   FormControl, Box, Table, TableBody, TableCell,
   TableRow, IconButton, Divider,
   Checkbox, FormControlLabel, Card, CardContent, Chip, Tooltip, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, Badge, Avatar
+  Dialog, DialogTitle, DialogContent, DialogActions, Badge, Avatar, useMediaQuery
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -63,6 +63,8 @@ const ReceiptStyles = `
 const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
   const { t, receiptLang, toggleReceiptLang } = useLanguage();
   const { isAdmin } = useAuth();
+  const isMobile = useMediaQuery('(max-width:600px)');
+  const [mobileTab, setMobileTab] = useState(0); // 0 for Catalog, 1 for Cart
 
   /* ── Lot aging data for FIFO badge ── */
   const [lotAging, setLotAging] = React.useState([]);
@@ -307,23 +309,57 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
   };
 
   return (
-    <Box sx={{ p: 1 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Box sx={{ p: isMobile ? 0 : 1 }}>
+      <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>{t('posTitle')}</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>{t('posSubTitle')}</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, display: {xs: 'none', sm: 'block'} }}>{t('posSubTitle')}</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          {saveStatus && <Alert severity="info" sx={{ py: 0, px: 2, borderRadius: 2 }}>{saveStatus}</Alert>}
-          <IconButton color="primary" onClick={() => window.location.reload()} title="Reload Application"><RefreshIcon /></IconButton>
-          <Button variant="outlined" onClick={handleLoadDraft} disabled={!localStorage.getItem('pos_draft_invoice')} sx={{ borderRadius: 3, px: 3 }}>Restore Draft</Button>
-          <Button variant="outlined" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, px: 3 }}>History</Button>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {saveStatus && <Alert severity="info" sx={{ py: 0, px: 2, borderRadius: 2, display: {xs: 'none', md: 'flex'} }}>{saveStatus}</Alert>}
+          <IconButton color="primary" onClick={() => window.location.reload()} title="Reload Application" size="small"><RefreshIcon /></IconButton>
+          <Button variant="outlined" size="small" onClick={handleLoadDraft} disabled={!localStorage.getItem('pos_draft_invoice')} sx={{ borderRadius: 3, px: 2, fontSize: '0.75rem' }}>Restore</Button>
+          <Button variant="outlined" size="small" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, px: 2, fontSize: '0.75rem' }}>History</Button>
         </Box>
       </Box>
 
-      <Grid container spacing={3}>
+      {isMobile && (
+        <Box sx={{ mb: 2, bgcolor: '#fff', borderRadius: 3, p: 0.5, display: 'flex', border: '1px solid rgba(0,0,0,0.05)' }}>
+          <Button 
+            fullWidth 
+            onClick={() => setMobileTab(0)} 
+            sx={{ 
+              borderRadius: 2.5, 
+              bgcolor: mobileTab === 0 ? 'primary.main' : 'transparent', 
+              color: mobileTab === 0 ? '#fff' : 'text.secondary',
+              py: 1,
+              fontWeight: 800,
+              '&:hover': { bgcolor: mobileTab === 0 ? 'primary.dark' : 'rgba(0,0,0,0.04)' }
+            }}
+          >
+            Catalog
+          </Button>
+          <Button 
+            fullWidth 
+            onClick={() => setMobileTab(1)} 
+            sx={{ 
+              borderRadius: 2.5, 
+              bgcolor: mobileTab === 1 ? 'primary.main' : 'transparent', 
+              color: mobileTab === 1 ? '#fff' : 'text.secondary',
+              py: 1,
+              fontWeight: 800,
+              '&:hover': { bgcolor: mobileTab === 1 ? 'primary.dark' : 'rgba(0,0,0,0.04)' }
+            }}
+          >
+            Cart ({invoice.items.length})
+          </Button>
+        </Box>
+      )}
+
+      <Grid container spacing={isMobile ? 2 : 3}>
         {/* Top Panel: Customer & Meta */}
-        <Grid item xs={12}>
+        {(!isMobile || (isMobile && mobileTab === 0)) && (
+          <Grid item xs={12}>
           <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
             <CardContent sx={{ p: 4 }}>
               <Grid container spacing={{xs: 2, md: 4}}>
@@ -383,10 +419,12 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               </Grid>
             </CardContent>
           </Card>
-        </Grid>
+          </Grid>
+        )}
 
         {/* Selection Area */}
-        <Grid item xs={12} md={7}>
+        {(!isMobile || (isMobile && mobileTab === 0)) && (
+          <Grid item xs={12} md={7}>
           <Card sx={{ borderRadius: 4, minHeight: 600, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ p: {xs: 1.5, md: 3}, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: {xs: 1, sm: 2}, alignItems: 'center', flexWrap: 'wrap' }}>
               <Button size="small" variant={selectedCategory === 'all' ? "contained" : "text"} onClick={() => setSelectedCategory('all')} sx={{ fontWeight: 800, borderRadius: 2, background: selectedCategory === 'all' ? 'linear-gradient(135deg,#1a237e,#311b92)' : undefined }}>All</Button>
@@ -726,10 +764,12 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               </Grid>
             </Box>
           </Card>
-        </Grid>
+          </Grid>
+        )}
 
         {/* Draft Invoice */}
-        <Grid item xs={12} md={5}>
+        {(!isMobile || (isMobile && mobileTab === 1)) && (
+          <Grid item xs={12} md={5}>
           <Paper sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '85vh', borderRadius: 4, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
             <Box sx={{ p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e293b' }}>{t('draftInvoice')}</Typography>
@@ -753,8 +793,8 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           {item.type === 'tire' && tires.find(t => t.id === item.tire_id)?.images?.[0] && (
                             <Avatar src={tires.find(t => t.id === item.tire_id).images[0]} variant="rounded" sx={{ width: 32, height: 32 }} />
                           )}
-                          <Box>
-                            <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.2 }}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {item.type === 'tire' ? (() => {
                                 const tire = tires.find(t => t.id === item.tire_id);
                                 if (!tire) return 'Unknown Tire';
@@ -772,7 +812,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                                 );
                               })() : item.type === 'part' ? parts.find(p => p.id === item.part_id)?.name : item.service_name}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>{item.quantity} × {Number(item.price).toLocaleString()} {currency}</Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{item.quantity} × {Number(item.price).toLocaleString()} {currency}</Typography>
                           </Box>
                         </Box>
                       </TableCell>
@@ -917,16 +957,18 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
             </Box>
           </Paper>
         </Grid>
-      </Grid>
+      )}
+    </Grid>
 
-      {/* Receipt Preview Dialog */}
+    {/* Receipt Preview Dialog */}
       <Dialog 
         open={isPrintDialogOpen} 
         onClose={() => setIsPrintDialogOpen(false)} 
         maxWidth="xs" 
         fullWidth 
+        fullScreen={isMobile}
         scroll="paper" 
-        PaperProps={{ sx: { borderRadius: 4, m: 2, maxHeight: '90vh' } }}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4, m: isMobile ? 0 : 2, maxHeight: isMobile ? '100vh' : '90vh' } }}
         sx={{
           '& .MuiBackdrop-root': {
             backgroundColor: 'rgba(248, 250, 253, 0.95)',

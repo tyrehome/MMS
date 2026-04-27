@@ -3,7 +3,7 @@ import {
     Typography, Grid, TextField, Button, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Box, Chip, Card,
     Avatar, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-    Select, MenuItem, FormControl, InputLabel, LinearProgress, Tooltip
+    Select, MenuItem, FormControl, InputLabel, LinearProgress, Tooltip, useMediaQuery
 } from '@mui/material';
 import {
     LocalHospital as PatchIcon,
@@ -54,6 +54,7 @@ const getCategoryColor = (cat) => CATEGORY_COLORS[cat] || '#546e7a';
 
 const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) => {
     const { isAdmin } = useAuth();
+    const isMobile = useMediaQuery('(max-width:600px)');
     const [parts, setParts]               = useState(partsProps);
     const [patchCount, setPatchCount]     = useState(0);
     const [newPart, setNewPart]           = useState({
@@ -145,7 +146,7 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
         : null;
 
     return (
-        <Box sx={{ p: 1 }}>
+        <Box sx={{ p: isMobile ? 0 : 1 }}>
             {/* Header */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>
@@ -157,47 +158,47 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
             </Box>
 
             {/* Stats Row */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={isMobile ? 1.5 : 2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={3}>
-                    <Card sx={{ borderRadius: 4, p: 3, background: 'linear-gradient(135deg, rgba(26,35,126,0.04) 0%, rgba(26,35,126,0.10) 100%)' }}>
+                    <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(26,35,126,0.04) 0%, rgba(26,35,126,0.10) 100%)' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <StockIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase' }}>Total SKUs</Typography>
+                            <StockIcon sx={{ color: 'primary.main', fontSize: isMobile ? 16 : 20 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Total SKUs</Typography>
                         </Box>
-                        <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>{totalSKUs}</Typography>
+                        <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>{totalSKUs}</Typography>
                     </Card>
                 </Grid>
 
                 <Grid item xs={6} sm={3}>
-                    <Card sx={{ borderRadius: 4, p: 3, background: 'linear-gradient(135deg, rgba(76,175,80,0.04) 0%, rgba(76,175,80,0.12) 100%)' }}>
+                    <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(76,175,80,0.04) 0%, rgba(76,175,80,0.12) 100%)' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <StockIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase' }}>Stock Units</Typography>
+                            <StockIcon sx={{ color: 'success.main', fontSize: isMobile ? 16 : 20 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Stock Units</Typography>
                         </Box>
-                        <Typography variant="h3" sx={{ fontWeight: 900, color: 'success.main', lineHeight: 1 }}>{totalStock.toLocaleString()}</Typography>
+                        <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'success.main', lineHeight: 1 }}>{totalStock.toLocaleString()}</Typography>
                     </Card>
                 </Grid>
 
                 {isAdmin ? (
                     <>
                         <Grid item xs={6} sm={3}>
-                            <Card sx={{ borderRadius: 4, p: 3, background: 'linear-gradient(135deg, rgba(245,0,87,0.04) 0%, rgba(245,0,87,0.12) 100%)' }}>
+                            <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(245,0,87,0.04) 0%, rgba(245,0,87,0.12) 100%)' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <ValueIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase' }}>Stock Value</Typography>
+                                    <ValueIcon sx={{ color: 'secondary.main', fontSize: isMobile ? 16 : 20 }} />
+                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Stock Value</Typography>
                                 </Box>
-                                <Typography variant="h5" sx={{ fontWeight: 900, color: 'secondary.main', lineHeight: 1.2 }}>{totalValue.toLocaleString()}</Typography>
-                                <Typography variant="caption" sx={{ opacity: 0.6 }}>{currency}</Typography>
+                                <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 900, color: 'secondary.main', lineHeight: 1.2 }}>{totalValue.toLocaleString()}</Typography>
+                                <Typography variant="caption" sx={{ opacity: 0.6, fontSize: '0.6rem' }}>{currency}</Typography>
                             </Card>
                         </Grid>
                         <Grid item xs={6} sm={3}>
-                            <Card sx={{ borderRadius: 4, p: 3, background: 'linear-gradient(135deg, rgba(230,81,0,0.04) 0%, rgba(230,81,0,0.14) 100%)' }}>
+                            <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(230,81,0,0.04) 0%, rgba(230,81,0,0.14) 100%)' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <ProfitIcon sx={{ color: '#e65100', fontSize: 20 }} />
-                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase' }}>Potential Profit</Typography>
+                                    <ProfitIcon sx={{ color: '#e65100', fontSize: isMobile ? 16 : 20 }} />
+                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Potential Profit</Typography>
                                 </Box>
-                                <Typography variant="h5" sx={{ fontWeight: 900, color: '#e65100', lineHeight: 1.2 }}>{totalProfit.toLocaleString()}</Typography>
-                                <Typography variant="caption" sx={{ opacity: 0.6 }}>{currency} · {avgMargin}% avg margin</Typography>
+                                <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 900, color: '#e65100', lineHeight: 1.2 }}>{totalProfit.toLocaleString()}</Typography>
+                                <Typography variant="caption" sx={{ opacity: 0.6, fontSize: '0.6rem' }}>{currency} · {avgMargin}% avg</Typography>
                             </Card>
                         </Grid>
                     </>
@@ -307,7 +308,7 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
 
                                 {/* Margin badge + Submit */}
                                 <Grid item xs={12} sm={newPart.category === 'Custom' ? 12 : 2}>
-                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: isMobile ? 2 : 0 }}>
                                         {liveMargin !== null && newPart.cost_price > 0 && (
                                             <Chip
                                                 label={`+${liveMargin}% margin`}
@@ -319,7 +320,7 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                                                 }}
                                             />
                                         )}
-                                        <Button fullWidth variant="contained" type="submit" sx={{ height: 48, borderRadius: 3, fontWeight: 900, minWidth: 110 }}>
+                                        <Button fullWidth variant="contained" type="submit" sx={{ height: isMobile ? 40 : 48, borderRadius: 3, fontWeight: 900, minWidth: 110 }}>
                                             APPEND
                                         </Button>
                                     </Box>
@@ -353,7 +354,7 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                             </Box>
                         </Box>
 
-                        <TableContainer>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                     <TableRow>

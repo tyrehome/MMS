@@ -5,7 +5,7 @@ import {
     Chip, TextField, InputAdornment, Button, IconButton,
     Collapse, Avatar, MenuItem, Select, FormControl, InputLabel,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Snackbar, Alert
+    Snackbar, Alert, useMediaQuery
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -14,24 +14,21 @@ import { useAuth } from './AuthContext';
 import CurrentAccount from './CurrentAccount';
 import { supabase } from '../supabaseClient';
 import {
-    AccountBalance as BankIcon,
     Timeline as AnalyticsIcon,
-    History as HistoryIcon,
     Search as SearchIcon,
     ExpandMore as ExpandMoreIcon,
     ExpandLess as ExpandLessIcon,
     AttachMoney as CashIcon,
     CreditCard as CreditIcon,
     ShoppingCart as CartIcon,
-    Security as AuditIcon,
     CalendarToday as CalendarIcon,
     Receipt as ReceiptIcon,
     Refresh as RefreshIcon,
-    LocalShipping as SupplierIcon
 } from '@mui/icons-material';
 
 const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], suppliers = [], businessProfile, recordAudit }) => {
     const { isAdmin } = useAuth();
+    const isMobile = useMediaQuery('(max-width:600px)');
     const [hubTab, setHubTab] = useState(0);
     const [reportTab, setReportTab] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
@@ -42,11 +39,6 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
     const [loadingAudit, setLoadingAudit] = useState(false);
 
     // Supplier Payables
-    const [openSupplierDialog, setOpenSupplierDialog] = useState(false);
-    const [openPayVendorDialog, setOpenPayVendorDialog] = useState(false);
-    const [supplierDetails, setSupplierDetails] = useState({ name: '', phone: '', email: '', payable_balance: 0 });
-    const [selectedSupplierId, setSelectedSupplierId] = useState(null);
-    const [paymentAmount, setPaymentAmount] = useState(0);
     const [openVendorStatement, setOpenVendorStatement] = useState(false);
     const [selectedSupplierForStatement, setSelectedSupplierForStatement] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -225,15 +217,15 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
     }
 
     return (
-        <Box sx={{ p: 2 }}>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
+        <Box sx={{ p: isMobile ? 0 : 2 }}>
+            <Box sx={{ mb: isMobile ? 3 : 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
                 <Box>
                     <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Finance & Ledger Hub</Typography>
-                    <Typography variant="body1" color="text.secondary">Administrative control over business performance, sales history, and audit trail</Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, display: {xs: 'none', sm: 'block'} }}>Automated financial reporting & operational audit trails</Typography>
                 </Box>
                 
                 {/* Global Stats Header - Quick Access */}
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, width: isMobile ? '100%' : 'auto' }}>
                     <Card sx={{ bgcolor: 'primary.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
                         <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>REVENUE (TO DATE)</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>{pandLData.revenue.toLocaleString()} {currency}</Typography>
@@ -249,22 +241,18 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                 </Box>
             </Box>
 
-            <Tabs
-                value={hubTab}
-                onChange={(e, v) => setHubTab(v)}
-                sx={{
-                    mb: 4,
-                    '& .MuiTabs-indicator': { height: 3, borderRadius: 1.5 },
-                    '& .MuiTab-root': { fontWeight: 800, fontSize: '0.9rem', textTransform: 'none', minHeight: 48 }
-                }}
-                variant="scrollable"
-                scrollButtons="auto"
+            <Tabs 
+                value={hubTab} 
+                onChange={(_, v) => setHubTab(v)} 
+                variant={isMobile ? "scrollable" : "standard"}
+                scrollButtons={isMobile ? "auto" : false}
+                sx={{ mb: 4, borderBottom: '1px solid rgba(0,0,0,0.05)', '& .MuiTab-root': { fontWeight: 800, textTransform: 'none', fontSize: isMobile ? '0.85rem' : '1rem' } }}
             >
-                <Tab icon={<AnalyticsIcon />} iconPosition="start" label="Performance" />
-                <Tab icon={<HistoryIcon />} iconPosition="start" label="Sales History" />
-                <Tab icon={<BankIcon />} iconPosition="start" label="Customer Receivables" />
-                <Tab icon={<SupplierIcon />} iconPosition="start" label="Vendor Payables" />
-                <Tab icon={<AuditIcon />} iconPosition="start" label="Audit Log" />
+                <Tab label="P&L Analytics" />
+                <Tab label="Inventory Valuation" />
+                <Tab label="Sales History" />
+                <Tab label="Vendor Status" />
+                <Tab label="Audit Trail" />
             </Tabs>
 
             {/* TAB 0: Performance Analytics */}
@@ -296,7 +284,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                     )}
 
                     {reportTab === 1 && (
-                        <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+                        <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                     <TableRow>
@@ -420,7 +408,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>Daily Summary</Typography>
                             <Card sx={{ borderRadius: 4, mb: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                <TableContainer>
+                                <TableContainer sx={{ overflowX: 'auto' }}>
                                     <Table>
                                         <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                             <TableRow>
@@ -460,7 +448,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>All Transactions ({filteredSales.length})</Typography>
                             <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                <TableContainer>
+                                <TableContainer sx={{ overflowX: 'auto' }}>
                                     <Table>
                                         <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                             <TableRow>
@@ -563,14 +551,12 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                 />
             )}
 
-            {/* TAB 3: Vendor Payables */}
+            {/* TAB 3: Vendor Status */}
             {hubTab === 3 && (
                 <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 900 }}>Vendor Payables Ledger</Typography>
-                        <Button variant="contained" onClick={() => { setSupplierDetails({ name: '', phone: '', email: '', payable_balance: 0 }); setOpenSupplierDialog(true); }} sx={{ borderRadius: 3, fontWeight: 900 }}>
-                            ADD NEW VENDOR
-                        </Button>
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 900 }}>Vendor Financial Status</Typography>
+                        <Typography variant="body2" color="text.secondary">View-only ledger for financial reporting. Manage payments in Supplier Management.</Typography>
                     </Box>
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         <Grid item xs={12} md={4}>
@@ -585,7 +571,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         </Grid>
                     </Grid>
                     <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <TableContainer>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                     <TableRow>
@@ -607,21 +593,12 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                             <TableCell align="center">
                                                 <Button 
                                                     size="small" 
-                                                    variant="outlined" 
+                                                    variant="contained" 
                                                     color="primary"
-                                                    onClick={() => { setSelectedSupplierId(sup.id); setPaymentAmount(0); setOpenPayVendorDialog(true); }}
-                                                    sx={{ borderRadius: 2, mr: 1, mb: {xs: 1, sm: 0} }}
-                                                >
-                                                    LOG PAYMENT
-                                                </Button>
-                                                <Button 
-                                                    size="small" 
-                                                    variant="outlined" 
-                                                    color="secondary"
                                                     onClick={() => { setSelectedSupplierForStatement(sup); setOpenVendorStatement(true); }}
-                                                    sx={{ borderRadius: 2 }}
+                                                    sx={{ borderRadius: 2, px: 3, fontWeight: 800 }}
                                                 >
-                                                    VIEW LEDGER
+                                                    VIEW FULL DETAILS & LEDGER
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -631,78 +608,28 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         </TableContainer>
                     </Card>
 
-                    {/* Dialogs for Vendors */}
-                    <Dialog open={openSupplierDialog} onClose={() => setOpenSupplierDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-                        <DialogTitle sx={{ fontWeight: 900 }}>Register New Vendor</DialogTitle>
-                        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                            <TextField label="Supplier Name" value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} fullWidth />
-                            <TextField label="Phone Number" value={supplierDetails.phone} onChange={e => setSupplierDetails({...supplierDetails, phone: e.target.value})} fullWidth />
-                            <TextField label="Opening Balance to Pay" type="number" value={supplierDetails.payable_balance} onChange={e => setSupplierDetails({...supplierDetails, payable_balance: e.target.value})} fullWidth />
-                        </DialogContent>
-                        <DialogActions>
-                            <Button onClick={() => setOpenSupplierDialog(false)}>Cancel</Button>
-                            <Button variant="contained" onClick={async () => {
-                                const newTx = [];
-                                if (Number(supplierDetails.payable_balance) > 0) {
-                                    newTx.push({
-                                        id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                                        date: new Date().toISOString().split('T')[0],
-                                        type: 'Opening Balance',
-                                        amount: Number(supplierDetails.payable_balance),
-                                        description: 'Initial balance'
-                                    });
-                                }
-                                await supabase.from('suppliers').insert([{ 
-                                    ...supplierDetails, 
-                                    payable_balance: Number(supplierDetails.payable_balance),
-                                    transactions: newTx
-                                }]);
-                                setOpenSupplierDialog(false);
-                            }}>SAVE VENDOR</Button>
-                        </DialogActions>
-                    </Dialog>
-
-                    <Dialog open={openPayVendorDialog} onClose={() => setOpenPayVendorDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-                        <DialogTitle sx={{ fontWeight: 900 }}>Pay Vendor</DialogTitle>
-                        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                            <Typography variant="body2">Record a payment made to reduce your outstanding balance.</Typography>
-                            <TextField label="Payment Amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} fullWidth />
-                        </DialogContent>
-                        <DialogActions>
-                            <Button onClick={() => setOpenPayVendorDialog(false)}>Cancel</Button>
-                            <Button variant="contained" onClick={async () => {
-                                const sup = suppliers.find(s => s.id === selectedSupplierId);
-                                const newBalance = Math.max(0, Number(sup.payable_balance || 0) - Number(paymentAmount));
-                                const tx = {
-                                    id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                                    date: new Date().toISOString().split('T')[0],
-                                    type: 'Payment Made',
-                                    amount: Number(paymentAmount),
-                                    description: 'Manual Payment'
-                                };
-                                const newTransactions = [...(sup.transactions || []), tx];
-                                await supabase.from('suppliers').update({ 
-                                    payable_balance: newBalance,
-                                    transactions: newTransactions
-                                }).eq('id', selectedSupplierId);
-                                
-                                await recordAudit('Vendor Payment', {
-                                    supplier: sup?.name,
-                                    amount: paymentAmount,
-                                    new_balance: newBalance
-                                });
-
-                                setOpenPayVendorDialog(false);
-                            }}>POST PAYMENT</Button>
-                        </DialogActions>
-                    </Dialog>
-
                     <Dialog open={openVendorStatement} onClose={() => setOpenVendorStatement(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
                         <DialogTitle sx={{ fontWeight: 900 }}>
-                            Vendor Ledger: {selectedSupplierForStatement?.name}
+                            Vendor Ledger & Details: {selectedSupplierForStatement?.name}
                         </DialogTitle>
                         <DialogContent>
-                            <TableContainer>
+                            <Box sx={{ mb: 3, display: 'flex', gap: 4, bgcolor: 'rgba(26,35,126,0.02)', p: 2, borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>PHONE</Typography>
+                                    <Typography sx={{ fontWeight: 800 }}>{selectedSupplierForStatement?.phone || '—'}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>EMAIL</Typography>
+                                    <Typography sx={{ fontWeight: 800 }}>{selectedSupplierForStatement?.email || '—'}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>CURRENT PAYABLE</Typography>
+                                    <Typography sx={{ fontWeight: 900, color: 'error.main' }}>{Number(selectedSupplierForStatement?.payable_balance || 0).toLocaleString()} {currency}</Typography>
+                                </Box>
+                            </Box>
+                            
+                            <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, color: 'primary.main' }}>TRANSACTION HISTORY</Typography>
+                            <TableContainer sx={{ overflowX: 'auto', maxHeight: 400 }}>
                                 <Table size="small">
                                     <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                         <TableRow>
@@ -758,7 +685,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         </Box>
                     </Box>
                     <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <TableContainer>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
                                     <TableRow>

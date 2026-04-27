@@ -3,7 +3,7 @@ import {
   Grid, Typography, TextField, Divider, IconButton, Dialog, DialogActions,
   DialogContent, DialogTitle, Chip, Box, Card, CardContent, TableContainer, Table, TableHead, TableRow, TableCell,
   TableBody, Menu, MenuItem, Tabs, Tab, FormControl, InputLabel, Select, Snackbar, Alert, Avatar,
-  Button, Tooltip
+  Button, Tooltip, useMediaQuery
 } from "@mui/material";
 import {
   Add as AddIcon, 
@@ -25,6 +25,7 @@ import { useAuth } from "./AuthContext";
 
 const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] }) => {
   const { isAdmin } = useAuth();
+  const isMobile = useMediaQuery('(max-width:600px)');
   const [accounts, setAccounts] = useState(accountsList);
   const [invoices, setInvoices] = useState(invoicesList);
   const [currentTab, setCurrentTab] = useState(0);
@@ -240,10 +241,12 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
       <Tabs 
         value={currentTab} 
         onChange={(e, v) => setCurrentTab(v)} 
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
         sx={{ 
           mb: 4,
           '& .MuiTabs-indicator': { height: 3, borderRadius: 1.5 },
-          '& .MuiTab-root': { fontWeight: 800, fontSize: '0.95rem', textTransform: 'none' }
+          '& .MuiTab-root': { fontWeight: 800, fontSize: isMobile ? '0.85rem' : '0.95rem', textTransform: 'none' }
         }}
       >
         <Tab icon={<BankIcon />} iconPosition="start" label="Balance Overview" />
@@ -258,14 +261,14 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
             { label: 'Total Payables (Creditors)', value: totals.payable, icon: <TrendingDownIcon />, color: 'error.main', bg: 'rgba(244, 67, 54, 0.05)' },
             { label: 'Net Business Position', value: totals.net, icon: <WalletIcon />, color: '#fff', bg: 'linear-gradient(135deg, #1a237e 0%, #311b92 100%)', dark: true }
           ].map((stat, i) => (
-            <Grid item xs={12} md={4} key={i}>
+            <Grid item xs={12} sm={6} md={4} key={i}>
               <Card sx={{ borderRadius: 4, background: stat.bg, color: stat.dark ? '#fff' : 'inherit', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.8 }}>{stat.label}</Typography>
-                    <Avatar sx={{ bgcolor: stat.dark ? 'rgba(255,255,255,0.1)' : stat.bg, color: stat.dark ? '#fff' : stat.color }}>{stat.icon}</Avatar>
+                <CardContent sx={{ p: isMobile ? 2.5 : 4 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.8, fontSize: '0.65rem' }}>{stat.label}</Typography>
+                    <Avatar sx={{ bgcolor: stat.dark ? 'rgba(255,255,255,0.1)' : stat.bg, color: stat.dark ? '#fff' : stat.color, width: 32, height: 32 }}>{stat.icon}</Avatar>
                   </Box>
-                  <Typography variant="h3" sx={{ fontWeight: 900 }}>{stat.value.toLocaleString()} <Typography component="span" variant="h6" sx={{ opacity: 0.6 }}>{currency}</Typography></Typography>
+                  <Typography variant={isMobile ? "h5" : "h3"} sx={{ fontWeight: 900 }}>{stat.value.toLocaleString()} <Typography component="span" variant="caption" sx={{ opacity: 0.6, fontWeight: 700 }}>{currency}</Typography></Typography>
                 </CardContent>
               </Card>
             </Grid>
@@ -287,7 +290,7 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
             )}
           </Box>
           <Card sx={{ borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table>
                 <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
                   <TableRow>
@@ -322,7 +325,7 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
       {currentTab === 2 && (
         <Box>
           <Card sx={{ borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table>
                 <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
                   <TableRow>
@@ -355,9 +358,16 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
       )}
 
       {/* Dialogs and Menus remain largely similar but with refined styling */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle sx={{ fontWeight: 900, pb: 1 }}>New Credit Account</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>
+      <Dialog 
+        open={openDialog} 
+        onClose={() => setOpenDialog(false)} 
+        maxWidth="sm" 
+        fullWidth 
+        fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, pb: 1, borderBottom: isMobile ? '1px solid rgba(0,0,0,0.05)' : 'none' }}>New Credit Account</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: isMobile ? 3 : 2 }}>
           <TextField
             label="Account / Customer Name *"
             fullWidth variant="outlined"
@@ -394,9 +404,14 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openTransactionDialog} onClose={() => setOpenTransactionDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 2, minWidth: 400 } }}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Journal Entry: {accounts.find(a => a.id === selectedAccountId)?.name}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+      <Dialog 
+        open={openTransactionDialog} 
+        onClose={() => setOpenTransactionDialog(false)} 
+        fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4, p: isMobile ? 1 : 2, minWidth: isMobile ? '100%' : 400 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, borderBottom: isMobile ? '1px solid rgba(0,0,0,0.05)' : 'none' }}>Journal Entry: {accounts.find(a => a.id === selectedAccountId)?.name}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: isMobile ? 3 : 2 }}>
           <FormControl fullWidth>
             <InputLabel>Transaction Type</InputLabel>
             <Select 
@@ -421,13 +436,21 @@ const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [] 
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openStatement} onClose={() => setOpenStatement(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Dialog 
+        open={openStatement} 
+        onClose={() => setOpenStatement(false)} 
+        maxWidth="md" 
+        fullWidth 
+        fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isMobile ? '1px solid rgba(0,0,0,0.05)' : 'none' }}>
           Account Statement: {selectedAccountForStatement?.name}
-          <Button startIcon={<PictureAsPdfIcon />} onClick={() => downloadStatement(selectedAccountForStatement)} size="small">Export PDF</Button>
+          {!isMobile && <Button startIcon={<PictureAsPdfIcon />} onClick={() => downloadStatement(selectedAccountForStatement)} size="small">Export PDF</Button>}
+          {isMobile && <IconButton onClick={() => downloadStatement(selectedAccountForStatement)} color="primary"><PictureAsPdfIcon /></IconButton>}
         </DialogTitle>
-        <DialogContent>
-          <TableContainer>
+        <DialogContent sx={{ px: isMobile ? 1 : 3 }}>
+          <TableContainer sx={{ overflowX: 'auto' }}>
             <Table size="small">
               <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                 <TableRow>

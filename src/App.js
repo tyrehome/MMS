@@ -57,14 +57,14 @@ const miniDrawerWidth = 72;
 const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })(
   ({ theme, open }) => ({
     flexGrow: 1,
-    padding: theme.spacing(3),
+    padding: theme.spacing(4),
     transition: theme.transitions.create(["margin", "padding"], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
     }),
     marginLeft: 0,
-    [theme.breakpoints.up("sm")]: {
-      marginLeft: open ? 0 : `0px`, // Logic handled by Drawer being permanent
+    [theme.breakpoints.down("md")]: {
+      padding: theme.spacing(3),
     },
     [theme.breakpoints.down("sm")]: {
       padding: theme.spacing(1.5),
@@ -297,8 +297,19 @@ const AppContent = () => {
         shape: { borderRadius: 16 },
         typography: {
           fontFamily: '"Outfit", "Inter", "Roboto", sans-serif',
-          h4: { fontWeight: 900, letterSpacing: '-0.8px' },
-          h6: { fontWeight: 800 },
+          h4: { 
+            fontWeight: 900, 
+            letterSpacing: '-0.8px',
+            '@media (max-width:600px)': { fontSize: '1.75rem' }
+          },
+          h5: { 
+            fontWeight: 900,
+            '@media (max-width:600px)': { fontSize: '1.5rem' }
+          },
+          h6: { 
+            fontWeight: 800,
+            '@media (max-width:600px)': { fontSize: '1.2rem' }
+          },
           button: { textTransform: 'none', fontWeight: 700 },
         },
         components: {
@@ -667,8 +678,8 @@ const AppContent = () => {
                 <Typography variant="h6" noWrap sx={{ color: 'primary.main', fontWeight: 800 }}>
                   {businessProfile.name}
                 </Typography>
-                <Divider orientation="vertical" flexItem sx={{ mx: 2, height: 24, alignSelf: 'center', borderColor: 'rgba(0,0,0,0.1)' }} />
-                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                <Divider orientation="vertical" flexItem sx={{ mx: 2, height: 24, alignSelf: 'center', borderColor: 'rgba(0,0,0,0.1)', display: { xs: 'none', sm: 'block' } }} />
+                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>
                   {selectedComponent}
                 </Typography>
               </Box>

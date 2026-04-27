@@ -4,7 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, TextField, Select,
   MenuItem, FormControl, InputLabel, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, Snackbar, Tab, Tabs, ToggleButton, ToggleButtonGroup
+  LinearProgress, Snackbar, Tab, Tabs, ToggleButton, ToggleButtonGroup, useMediaQuery
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { supabase } from '../supabaseClient';
 
 const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, setSelectedComponent, isAdmin }) => {
+  const isMobile = useMediaQuery('(max-width:600px)');
   const [workers, setWorkers] = useState(workersList);
   const [tasks, setTasks] = useState(tasksList);
   const [tabValue, setTabValue] = useState(0);
@@ -106,10 +107,12 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
       <Tabs 
         value={tabValue} 
         onChange={(e, v) => setTabValue(v)} 
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
         sx={{ 
           mb: 4,
           '& .MuiTabs-indicator': { height: 3, borderRadius: 1.5 },
-          '& .MuiTab-root': { fontWeight: 800, fontSize: '0.95rem', textTransform: 'none' }
+          '& .MuiTab-root': { fontWeight: 800, fontSize: isMobile ? '0.85rem' : '0.95rem', textTransform: 'none' }
         }}
       >
         <Tab icon={<PeopleIcon />} iconPosition="start" label="Personnel & Tasks" />
@@ -123,13 +126,13 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
             </Box>
           )}
 
-          <Grid container spacing={3} sx={{ mb: 6 }}>
+          <Grid container spacing={isMobile ? 1.5 : 3} sx={{ mb: 4 }}>
             {[{ l: 'Total Operatives', v: workers.length, c: 'primary.main' }, { l: 'Queue Active', v: tasks.filter(t => t.status !== 'Completed').length, c: 'secondary.main' }, { l: 'Efficiency Index', v: `${tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'Completed').length / tasks.length) * 100) : 0}%`, c: 'success.main' }].map((s, i) => (
-              <Grid item xs={12} md={4} key={i}>
-                <Card sx={{ borderRadius: 4, p: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
-                    <CardContent>
-                        <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.6 }}>{s.l}</Typography>
-                        <Typography variant="h3" sx={{ fontWeight: 900, color: s.c }}>{s.v}</Typography>
+              <Grid item xs={12} sm={4} key={i}>
+                <Card sx={{ borderRadius: 4, p: isMobile ? 1.5 : 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                    <CardContent sx={{ p: isMobile ? 1 : 2 }}>
+                        <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.6, fontSize: '0.65rem' }}>{s.l}</Typography>
+                        <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: s.c }}>{s.v}</Typography>
                     </CardContent>
                 </Card>
               </Grid>
@@ -142,12 +145,12 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
               return (
                 <Grid item xs={12} sm={6} lg={4} key={worker.id}>
                   <Card sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)' }}>
-                    <CardContent sx={{ p: 4 }}>
+                    <CardContent sx={{ p: isMobile ? 2.5 : 4 }}>
                       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                        <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.main', fontWeight: 900 }}>{worker.name[0]}</Avatar>
+                        <Avatar sx={{ width: isMobile ? 48 : 64, height: isMobile ? 48 : 64, bgcolor: 'primary.main', fontWeight: 900 }}>{worker.name[0]}</Avatar>
                         <Box>
-                          <Typography sx={{ fontWeight: 900 }}>{worker.name}</Typography>
-                          <Chip label={worker.role} size="small" sx={{ fontWeight: 900, borderRadius: 2 }} />
+                          <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem' }}>{worker.name}</Typography>
+                          <Chip label={worker.role} size="small" sx={{ fontWeight: 900, borderRadius: 2, height: 20, fontSize: '0.65rem' }} />
                         </Box>
                       </Box>
                       <Box sx={{ mb: 3 }}>
@@ -155,9 +158,9 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
                             <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.6 }}>EFFICIENCY</Typography>
                             <Typography variant="caption" sx={{ fontWeight: 900 }}>{Math.round(stats.rate)}%</Typography>
                         </Box>
-                        <LinearProgress variant="determinate" value={stats.rate} sx={{ height: 8, borderRadius: 4 }} />
+                        <LinearProgress variant="determinate" value={stats.rate} sx={{ height: 6, borderRadius: 4 }} />
                       </Box>
-                      <Button fullWidth variant="contained" onClick={() => { setCurrentWorker(worker); setIsTaskModalOpen(true); }} sx={{ borderRadius: 3, fontWeight: 900 }}>DEPLOY TASK</Button>
+                      <Button fullWidth variant="contained" size={isMobile ? "small" : "medium"} onClick={() => { setCurrentWorker(worker); setIsTaskModalOpen(true); }} sx={{ borderRadius: 3, fontWeight: 900 }}>DEPLOY TASK</Button>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -181,7 +184,7 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
           </Box>
 
           <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table>
                 <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
                   <TableRow>

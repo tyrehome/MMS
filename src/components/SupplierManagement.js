@@ -5,7 +5,7 @@ import {
   Chip, TextField, InputAdornment, Button, IconButton,
   Avatar, 
   Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert,
-  ToggleButton, ToggleButtonGroup
+  ToggleButton, ToggleButtonGroup, useMediaQuery
 } from '@mui/material';
 import {
   LocalShipping as SupplierIcon,
@@ -24,6 +24,7 @@ import { useAuth } from './AuthContext';
 
 const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, updateSupplier, deleteSupplier }) => {
   useAuth();
+  const isMobile = useMediaQuery('(max-width:600px)');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [openPayDialog, setOpenPayDialog] = useState(false);
@@ -343,50 +344,50 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, upda
   return (
     <Box>
       {/* Header Section */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ mb: isMobile ? 3 : 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Supplier Management</Typography>
-          <Typography variant="body1" color="text.secondary">Vendor ledgers, bulk supply records, and payment tracking</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Vendor Management</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, display: {xs: 'none', sm: 'block'} }}>Track payables, inventory sourcing, and payment history</Typography>
         </Box>
         <Button 
           variant="contained" 
           startIcon={<SupplierIcon />} 
           onClick={() => setOpenVendorDialog(true)}
-          sx={{ borderRadius: 3, fontWeight: 900 }}
+          sx={{ borderRadius: 3, fontWeight: 900, px: isMobile ? 2 : 4 }}
         >
-          NEW VENDOR
+          {isMobile ? 'ADD' : 'NEW VENDOR'}
         </Button>
       </Box>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
+      <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={4}>
           <Card sx={{ borderRadius: 4, bgcolor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.1)' }}>
-            <CardContent>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
               <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Total Payables</Typography>
-              <Typography variant="h3" sx={{ fontWeight: 900, color: 'error.main' }}>
-                {suppliers.reduce((s, x) => s + Math.max(0, Number(x.payable_balance || 0)), 0).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
+              <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'error.main' }}>
+                {suppliers.reduce((s, x) => s + Math.max(0, Number(x.payable_balance || 0)), 0).toLocaleString()} <Typography component="span" variant="h6" sx={{ opacity: 0.5 }}>{currency}</Typography>
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6} md={4}>
           <Card sx={{ borderRadius: 4, bgcolor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
-            <CardContent>
-              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Advance Paid (Debits)</Typography>
-              <Typography variant="h3" sx={{ fontWeight: 900, color: 'success.main' }}>
-                {Math.abs(suppliers.reduce((s, x) => s + Math.min(0, Number(x.payable_balance || 0)), 0)).toLocaleString()} <Typography component="span" variant="h5" sx={{ opacity: 0.5 }}>{currency}</Typography>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Advance Paid</Typography>
+              <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'success.main' }}>
+                {Math.abs(suppliers.reduce((s, x) => s + Math.min(0, Number(x.payable_balance || 0)), 0)).toLocaleString()} <Typography component="span" variant="h6" sx={{ opacity: 0.5 }}>{currency}</Typography>
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6}>
           <Card sx={{ borderRadius: 4, bgcolor: 'rgba(26, 35, 126, 0.05)', border: '1px solid rgba(26, 35, 126, 0.1)' }}>
-            <CardContent>
-              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Total Suppliers</Typography>
-              <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main' }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.7 }}>Suppliers</Typography>
+              <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'primary.main' }}>
                 {suppliers.length}
               </Typography>
             </CardContent>
@@ -410,7 +411,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, upda
       </Card>
 
       {/* Suppliers Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+      <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
         <Table>
           <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
             <TableRow>
@@ -614,7 +615,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, upda
             <Typography variant="h6" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <HistoryIcon color="primary" /> Full Transaction History
             </Typography>
-            <TableContainer id="vendor-ledger-table" component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+            <TableContainer id="vendor-ledger-table" component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                   <TableRow>
@@ -671,7 +672,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, upda
             <Typography variant="h6" sx={{ fontWeight: 900, mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <PaymentsIcon color="primary" /> Payment Audit Records
             </Typography>
-            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                   <TableRow>
@@ -788,7 +789,7 @@ const SupplierManagement = ({ suppliers = [], businessProfile, recordAudit, upda
                 )}
               </Box>
 
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: 'auto' }}>
                 <Table size="small">
                   <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                     <TableRow>

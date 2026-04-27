@@ -3,7 +3,7 @@ import {
     Box, Typography, TextField, Button, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     IconButton, Alert, CircularProgress, Avatar, Chip, Card, CardContent,
-    FormControl, InputLabel, Select, MenuItem
+    FormControl, InputLabel, Select, MenuItem, useMediaQuery
 } from '@mui/material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const Settings = ({ businessProfile: propBusinessProfile, masterData: propMasterData }) => {
     const { user: currentUser } = useAuth();
+    const isMobile = useMediaQuery('(max-width:600px)');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -300,7 +301,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
     if (loading && users.length === 0) return <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>;
 
     return (
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ p: isMobile ? 1 : 2 }}>
             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
                     <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>System Administration</Typography>
@@ -311,7 +312,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
             {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 3, fontWeight: 700 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 3, borderRadius: 3, fontWeight: 700 }}>{success}</Alert>}
 
-            <Grid container spacing={4}>
+            <Grid container spacing={isMobile ? 2 : 4}>
                 {/* Business Profile Section */}
                 <Grid item xs={12} md={6}>
                     <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.02)' }}>
@@ -356,7 +357,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                             )}
                                         </Box>
                                     </Grid>
-                                    <Grid item xs={4}>
+                                    <Grid item xs={12} sm={4}>
                                         <TextField fullWidth label="Currency" value={businessProfile.currency || ''} onChange={(e) => setBusinessProfile({ ...businessProfile, currency: e.target.value })} variant="outlined" InputProps={{ sx: { borderRadius: 3 } }} />
                                     </Grid>
                                     <Grid item xs={12}>
@@ -432,16 +433,16 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
 
                             <Box component="form" onSubmit={handleAddUser} sx={{ mb: 4 }}>
                                 <Grid container spacing={1.5}>
-                                    <Grid item xs={12} sm={3}>
+                                    <Grid item xs={12} sm={6} md={3}>
                                         <TextField fullWidth size="small" placeholder="Full Name" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} InputProps={{ sx: { borderRadius: 2 } }} />
                                     </Grid>
-                                    <Grid item xs={12} sm={3}>
+                                    <Grid item xs={12} sm={6} md={3}>
                                         <TextField fullWidth size="small" placeholder="Email Address" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} InputProps={{ sx: { borderRadius: 2 } }} />
                                     </Grid>
-                                    <Grid item xs={12} sm={2}>
+                                    <Grid item xs={12} sm={6} md={2}>
                                         <TextField fullWidth size="small" placeholder="Password" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} InputProps={{ sx: { borderRadius: 2 } }} />
                                     </Grid>
-                                    <Grid item xs={12} sm={2}>
+                                    <Grid item xs={12} sm={6} md={2}>
                                         <FormControl fullWidth size="small">
                                             <InputLabel>Role</InputLabel>
                                             <Select
@@ -455,7 +456,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                             </Select>
                                         </FormControl>
                                     </Grid>
-                                    <Grid item xs={12} sm={2}>
+                                    <Grid item xs={12} md={2}>
                                         <Button type="submit" variant="contained" color="secondary" fullWidth sx={{ borderRadius: 2, fontWeight: 700, height: '40px' }}>CREATE</Button>
                                     </Grid>
                                 </Grid>

@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import {
   Typography, Grid, Card, Avatar, Modal,
   IconButton, Box, Button, Collapse, Chip,
-  LinearProgress, Stack, ToggleButton, ToggleButtonGroup
+  LinearProgress, Stack, ToggleButton, ToggleButtonGroup, useMediaQuery
 } from '@mui/material';
 import {
   AttachMoney as AttachMoneyIcon,
@@ -41,6 +41,7 @@ function Dashboard({
   const [expanded, setExpanded] = useState(false);
   const [dataHealthOpen, setDataHealthOpen] = useState(false);
   const [timeframe, setTimeframe] = useState('daily');
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   /* ── Lot Aging Alerts ── */
   const [agingAlerts, setAgingAlerts] = useState({ expired: 0, critical: 0, expiringSoon: 0, items: [] });
@@ -216,16 +217,16 @@ function Dashboard({
 
 
   return (
-    <Box sx={{ py: 2 }}>
+    <Box sx={{ py: isMobile ? 1 : 2 }}>
       {/* Header */}
-      <Box sx={{ mb: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ mb: isMobile ? 3 : 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Business Intelligence</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>Real-time operational overview & financial tracking</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, display: {xs: 'none', sm: 'block'} }}>Real-time operational overview & financial tracking</Typography>
         </Box>
-        <Stack direction="row" spacing={2}>
-          <Button variant="outlined" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, fontWeight: 700 }}>Full Report</Button>
-          <Button variant="contained" sx={{ borderRadius: 3, px: 4, fontWeight: 800 }} onClick={() => window.location.reload()}>Sync Now</Button>
+        <Stack direction="row" spacing={isMobile ? 1 : 2}>
+          <Button variant="outlined" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, fontWeight: 700, px: isMobile ? 1 : 2, fontSize: isMobile ? '0.75rem' : '0.85rem' }}>Full Report</Button>
+          <Button variant="contained" sx={{ borderRadius: 3, px: isMobile ? 2 : 4, fontWeight: 800, fontSize: isMobile ? '0.75rem' : '0.85rem' }} onClick={() => window.location.reload()}>Sync Now</Button>
         </Stack>
       </Box>
 
@@ -272,7 +273,7 @@ function Dashboard({
       )}
 
       {/* Primary KPI Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
         {statistics.slice(0, 4).map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
             <Card
