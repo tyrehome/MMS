@@ -365,11 +365,20 @@ BEGIN
         COALESCE((sale_payload->>'created_at')::TIMESTAMPTZ, NOW())
     ) RETURNING id INTO new_sale_id;
 
-    -- 3.5 Update Customer Account Balance for Credit Sales
+    -- 3.5 Update Customer Account Balance for Credit Sales & Append Transaction
     IF (sale_payload->>'payment_method') = 'Customer Credit' AND (sale_payload->>'account_id') IS NOT NULL AND (sale_payload->>'account_id') <> '' THEN
         UPDATE public.accounts 
         SET receivable = receivable + (sale_payload->>'total')::NUMERIC,
-            updated_at = NOW()
+            updated_at = NOW(),
+            transactions = COALESCE(transactions, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                    'id', 'pos-' || new_sale_id::TEXT,
+                    'date', COALESCE(sale_payload->>'date', to_char(NOW(), 'YYYY-MM-DD')),
+                    'type', 'Credit Sale',
+                    'amount', (sale_payload->>'total')::NUMERIC,
+                    'description', 'POS Invoice #' || SUBSTRING(new_sale_id::TEXT FROM 1 FOR 8)
+                )
+            )
         WHERE id = (sale_payload->>'account_id')::UUID;
     END IF;
 

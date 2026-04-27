@@ -769,11 +769,6 @@ const TireList = ({
                           )}
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          {isAdmin && item.type === 'tire' && item.name?.startsWith('Trade-in') && (
-                            <IconButton color="error" size="small" onClick={() => handleDeleteTire(item.id)} sx={{ bgcolor: 'rgba(244,67,54,0.05)' }}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          )}
                           <Button
                             size="small"
                             variant={inOrder ? 'contained' : 'outlined'}
@@ -812,7 +807,6 @@ const TireList = ({
                     {isAdmin && <TableCell align="right" sx={{ fontWeight: 900 }}>SELL PRICE</TableCell>}
                     {isAdmin && <TableCell align="right" sx={{ fontWeight: 900 }}>MARGIN</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 900 }}>ORDER</TableCell>
-                    {isAdmin && inventoryView !== 'parts' && <TableCell align="right" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -980,15 +974,7 @@ const TireList = ({
                           </Tooltip>
                         </TableCell>
 
-                        {isAdmin && inventoryView !== 'parts' && (
-                          <TableCell align="right">
-                            {item.type === 'tire' && item.name.startsWith('Trade-in') && (
-                              <IconButton color="error" size="small" onClick={() => handleDeleteTire(item.id)}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            )}
-                          </TableCell>
-                        )}
+
                       </TableRow>
                     );
                   })}

@@ -23,12 +23,12 @@ import "jspdf-autotable";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "./AuthContext";
 
-const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [], recordAudit }) => {
+const CurrentAccount = ({ businessProfile, accountsList = [], invoicesList = [], recordAudit, defaultTab = 0 }) => {
   const isMobile = useMediaQuery('(max-width:600px)');
   const { isAdmin } = useAuth();
   const [accounts, setAccounts] = useState(accountsList);
   const [invoices, setInvoices] = useState(invoicesList);
-  const [currentTab, setCurrentTab] = useState(0);
+  const [currentTab, setCurrentTab] = useState(defaultTab);
   const [openDialog, setOpenDialog] = useState(false);
   const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);

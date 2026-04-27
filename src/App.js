@@ -37,6 +37,7 @@ import AnalyticsIcon from "@mui/icons-material/Analytics";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import PersonIcon from "@mui/icons-material/Person";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import TireList from "./components/TireList";
 import Dashboard from "./components/Dashboard";
 import SaleForm from "./components/SaleForm";
@@ -44,7 +45,9 @@ import { AuthProvider, useAuth } from "./components/AuthContext";
 import { LanguageProvider, useLanguage } from "./components/LanguageContext";
 import Login from "./components/Login";
 import { supabase } from "./supabaseClient";
-import Reports from "./components/Reports";
+import FinanceHub from "./components/FinanceHub";
+import ReportsHub from "./components/ReportsHub";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import Settings from "./components/Settings";
 import CustomerProfile from "./components/CustomerProfile";
 import WorkerTracking from "./components/WorkerTracking";
@@ -360,7 +363,7 @@ const AppContent = () => {
         action,
         table_name: tableName,
         notes: typeof notes === 'object' ? JSON.stringify(notes) : notes,
-        record_id: notes.id || notes.brand || notes.reference_number || 'N/A',
+        record_id: notes.customer || notes.name || notes.brand || notes.reference_number || notes.id || 'System',
         user_id: user?.id
       }]);
     } catch (e) { console.warn("[Audit] Failed:", e.message); }
@@ -502,7 +505,8 @@ const AppContent = () => {
     { text: "Customer CRM", icon: <PersonIcon />, component: "CustomerCRM" },
     { text: "Workshop", icon: <BuildCircleIcon />, component: "Workshop" },
     { text: "Vendors & GRN", icon: <SupplierIcon />, component: "Suppliers", adminOnly: true },
-    { text: "Finance", icon: <AnalyticsIcon />, component: "Finance", adminOnly: true },
+    { text: "Finance Hub", icon: <AccountBalanceWalletIcon />, component: "Finance", adminOnly: true },
+    { text: "360 Reports", icon: <AssessmentIcon />, component: "Reports", adminOnly: true },
     { text: "Settings", icon: <SettingsIcon />, component: "Settings", adminOnly: true },
   ];
 
@@ -622,7 +626,10 @@ const AppContent = () => {
         return <WorkerTracking workersList={workers || []} tasksList={tasks || []} setBillingDraft={setBillingDraft} setSelectedComponent={setSelectedComponent} {...commonProps} />;
       
       case "Finance": 
-        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
+        return isAdmin ? <FinanceHub accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
+      
+      case "Reports": 
+        return isAdmin ? <ReportsHub tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
       
       case "Suppliers":
         return isAdmin ? <SupplierManagement suppliers={suppliers || []} updateSupplier={updateSupplier} deleteSupplier={deleteSupplier} {...commonProps} /> : posComponent;
