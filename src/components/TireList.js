@@ -295,11 +295,7 @@ const TireList = ({
     }
   };
 
-  const handleDeleteTire = async (id) => {
-    if (!window.confirm('Delete this item?')) return;
-    try { await deleteTire(id); setAlert({ open:true, message:'Deleted.', severity:'info' }); }
-    catch  { setAlert({ open:true, message:'Delete failed.',  severity:'error' }); }
-  };
+
 
   const handleReturnSubmit = async (e) => {
     e.preventDefault();

@@ -33,7 +33,7 @@ import SellIcon from "@mui/icons-material/Sell";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
-import AnalyticsIcon from "@mui/icons-material/Analytics";
+
 import InventoryIcon from "@mui/icons-material/Inventory";
 import PersonIcon from "@mui/icons-material/Person";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
