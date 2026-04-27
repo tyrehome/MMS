@@ -4,10 +4,9 @@ import {
     TableCell, TableContainer, TableHead, TableRow, Box, Chip, Card,
     Avatar, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
     Select, MenuItem, FormControl, InputLabel, LinearProgress, Tooltip, useMediaQuery,
-    Divider, Paper
+    Divider
 } from '@mui/material';
 import {
-    LocalHospital as PatchIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
     Search as SearchIcon,
@@ -53,11 +52,10 @@ const CATEGORY_COLORS = {
 
 const getCategoryColor = (cat) => CATEGORY_COLORS[cat] || '#546e7a';
 
-const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) => {
+const PartsInventory = ({ businessProfile, partsProps = [] }) => {
     const { isAdmin } = useAuth();
     const isMobile = useMediaQuery('(max-width:600px)');
     const [parts, setParts]               = useState(partsProps);
-    const [patchCount, setPatchCount]     = useState(0);
     const [newPart, setNewPart]           = useState({
         name: '', category: 'Consumable', customCategory: '',
         stock: 0, price: 0, cost_price: 0,
@@ -71,13 +69,6 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
 
     useEffect(() => setParts(partsProps), [partsProps]);
 
-    useEffect(() => {
-        let count = 0;
-        salesProps.forEach(s =>
-            s.items?.forEach(i => i.service_name === 'Patching' && (count += parseInt(i.quantity || 1)))
-        );
-        setPatchCount(count);
-    }, [salesProps]);
 
     /* ─── Helpers ─── */
     const getFinalCategory = (part) =>
@@ -97,7 +88,6 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
     const totalSKUs     = parts.length;
     const totalStock    = parts.reduce((s, p) => s + (p.stock || 0), 0);
     const totalValue    = parts.reduce((s, p) => s + ((p.stock || 0) * (p.price || 0)), 0);
-    const totalProfit   = parts.reduce((s, p) => s + ((p.stock || 0) * profitPerUnit(p)), 0);
     const avgMargin     = parts.length > 0
         ? (parts.reduce((s, p) => s + marginPct(p), 0) / parts.length).toFixed(1)
         : 0;

@@ -97,12 +97,6 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     return null;
   };
 
-  const globalExpiredCount = React.useMemo(() => {
-    return lotAging
-      .filter(l => l.age_status === 'Expired')
-      .reduce((sum, l) => sum + parseInt(l.current_qty || 0), 0);
-  }, [lotAging]);
-
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
     payment_method: 'Cash', account_id: '', items: [],

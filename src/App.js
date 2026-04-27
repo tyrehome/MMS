@@ -148,55 +148,50 @@ const AppContent = () => {
     }
   }, [isAdmin, selectedComponent]);
 
+  // --- CENTRALIZED DATA FETCHING ---
+  const fetchData = async (table, setter) => {
+    try {
+      const { data, error } = await supabase.from(table).select('*');
+      if (error) throw error;
+      if (data) setter(data);
+    } catch (e) {
+      console.error(`[Realtime Sync] Error fetching ${table}:`, e.message);
+      setDataError(`Sync Error: ${table}. Data may be stale.`);
+    }
+  };
+
+  const fetchSales = async () => {
+    const { data, error } = await supabase.from('sales').select('*, sale_items(*)');
+    if (!error && data) setSales(data);
+  };
+
+  const fetchMasterData = async () => {
+    const { data, error } = await supabase.from('master_data').select('*');
+    if (!error && data) {
+      const formatted = { brands: [], vehicles: [], services: [] };
+      data.forEach(item => {
+        if (formatted[item.type]) formatted[item.type].push(item.value);
+      });
+      setMasterData(formatted);
+    }
+  };
+
+  const fetchBusinessSettings = async () => {
+    const { data, error } = await supabase.from('business_settings').select('*').limit(1).maybeSingle();
+    if (!error && data) setBusinessProfile(data);
+  };
+
   // Initial Fetches and Subscriptions
   useEffect(() => {
     if (!user) return;
 
-    const fetchData = async (table, setter) => {
-      try {
-        const { data, error } = await supabase.from(table).select('*');
-        if (error) {
-          console.error(`[Data] Error fetching ${table}:`, error);
-          setDataError(`Database Error: Could not load ${table}. Check your connection or RLS policies.`);
-        } else if (data) {
-          setter(data);
-        }
-      } catch (e) {
-        console.warn(`[Data] Failed to fetch ${table}:`, e.message);
-      }
-    };
+    // --- PHASE 1: Immediate Load ---
+    fetchBusinessSettings();
+    fetchMasterData();
+    fetchData('tires', setTires);
+    fetchSales();
 
-    // --- PHASE 1: Priority Data (Dashboard & Business Config) ---
-    const fetchBusinessSettings = async () => {
-      const { data, error } = await supabase.from('business_settings').select('*').limit(1).maybeSingle();
-      if (!error && data) setBusinessProfile(data);
-    };
-    
-    const fetchMasterData = async () => {
-      const { data, error } = await supabase.from('master_data').select('*');
-      if (!error && data) {
-        const formatted = { brands: [], vehicles: [], services: [] };
-        data.forEach(item => {
-          if (formatted[item.type]) formatted[item.type].push(item.value);
-        });
-        setMasterData(formatted);
-      }
-    };
-
-    const fetchSales = async () => {
-      const { data, error } = await supabase.from('sales').select('*, sale_items(*)');
-      if (!error && data) setSales(data);
-    };
-
-    // Load mission-critical data immediately
-    Promise.all([
-      fetchBusinessSettings(),
-      fetchMasterData(),
-      fetchData('tires', setTires),
-      fetchSales()
-    ]);
-
-    // --- PHASE 2: Secondary Data (Deferred for 500ms to prioritize UI) ---
+    // --- PHASE 2: Deferred Load ---
     const secondaryTimer = setTimeout(() => {
       fetchData('hotel_tires', setHotelTires);
       fetchData('accounts', setAccounts);
@@ -212,29 +207,33 @@ const AppContent = () => {
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
-    const channel = supabase.channel('db-changes')
+    // This is the permanent solution: One listener for the whole schema
+    const channel = supabase.channel('system_wide_sync')
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         const table = payload.table;
-        console.log(`[Realtime] Change detected in ${table}:`, payload);
+        console.log(`[Realtime] Syncing table: ${table}`, payload);
         
+        // Strategy: When any change occurs, refresh that specific dataset
         if (table === 'master_data') fetchMasterData();
         else if (table === 'business_settings') fetchBusinessSettings();
-        else if (table === 'sales') fetchSales();
+        else if (table === 'sales' || table === 'sale_items') fetchSales();
         else {
-          const setters = {
+          const tableMap = {
             tires: setTires, hotel_tires: setHotelTires,
             accounts: setAccounts, parts: setParts, customers: setCustomers,
             appointments: setAppointments, invoices: setInvoices,
             workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
             suppliers: setSuppliers, inventory_lots: setInventoryLots
           };
-          if (setters[table]) {
-            fetchData(table, setters[table]);
+          if (tableMap[table]) {
+            fetchData(table, tableMap[table]);
           }
         }
       })
-      .subscribe((status) => {
-        console.log(`[Realtime] Subscription status: ${status}`);
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') console.log('✅ Real-time sync active.');
+        if (status === 'CLOSED') console.warn('⚠️ Real-time sync disconnected.');
+        if (err) console.error('❌ Sync error:', err);
       });
 
     return () => {
