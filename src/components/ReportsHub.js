@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
     Typography, Box, Tab, Tabs, Grid, Card, CardContent, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-    Chip, TextField, Button, useMediaQuery
+    Chip, TextField, Button, useMediaQuery, LinearProgress
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -16,7 +16,8 @@ import {
     Assignment as AuditIcon,
     CalendarToday as CalendarIcon,
     GetApp as DownloadIcon,
-    FlashOn as PulseIcon
+    FlashOn as PulseIcon,
+    Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -75,13 +76,14 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
             }
         } catch (error) {
             console.error('Audit fetch error:', error);
+            setAlert({ open: true, message: 'Failed to load audit logs: ' + error.message, severity: 'error' });
         } finally {
             setLoadingAudit(false);
         }
     };
 
     useEffect(() => {
-        if (tabValue === 3) fetchAuditLogs();
+        if (tabValue === 4) fetchAuditLogs();
     }, [tabValue]);
 
     // Analytics Logic
@@ -182,6 +184,9 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
             dataToExport.push({ Payment_Method: 'SALES COUNT', Amount: pulseData.count });
             filename = "performance_pulse";
         } else if (tabValue === 1) {
+            dataToExport = [{ Metric: 'Revenue', Value: pandLData.revenue }, { Metric: 'COGS', Value: pandLData.cogs }, { Metric: 'Gross Profit', Value: pandLData.grossProfit }];
+            filename = "pl_analytics";
+        } else if (tabValue === 2) {
             dataToExport = tires.map(t => ({ 
                 Item: `${t.brand} ${t.size}`, 
                 Stock: t.stock, 
@@ -189,7 +194,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                 Total_Value: (t.stock * t.cost_price) 
             }));
             filename = "inventory_valuation";
-        } else if (tabValue === 2) {
+        } else if (tabValue === 3) {
             dataToExport = filteredSales.map(s => ({ 
                 Date: s.created_at, 
                 Customer: s.customer_name, 
@@ -198,7 +203,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                 Total: s.total 
             }));
             filename = "sales_history";
-        } else if (tabValue === 3) {
+        } else if (tabValue === 4) {
             dataToExport = auditLogs.map(l => ({ 
                 Time: l.created_at, 
                 User: l.profiles?.name || 'System', 
@@ -421,7 +426,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                     </Box>
                 )}
 
-                {tabValue === 1 && (
+                {tabValue === 2 && (
                     <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
                         <Table>
                             <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
@@ -446,7 +451,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                     </TableContainer>
                 )}
 
-                {tabValue === 2 && (
+                {tabValue === 3 && (
                     <Box>
                         <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
                             <TextField 
@@ -487,8 +492,21 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                     </Box>
                 )}
 
-                {tabValue === 3 && (
-                    <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
+                {tabValue === 4 && (
+                    <Box>
+                        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button 
+                                size="small" 
+                                startIcon={<RefreshIcon />} 
+                                onClick={fetchAuditLogs} 
+                                disabled={loadingAudit}
+                                sx={{ borderRadius: 2, fontWeight: 700 }}
+                            >
+                                {loadingAudit ? 'Syncing...' : 'Refresh Logs'}
+                            </Button>
+                        </Box>
+                        {loadingAudit && <LinearProgress sx={{ mb: 2, borderRadius: 2 }} />}
+                        <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
                         <Table size="small">
                             <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                 <TableRow>
@@ -515,6 +533,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    </Box>
                 )}
             </Box>
 
