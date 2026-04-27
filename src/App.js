@@ -581,7 +581,7 @@ const AppContent = () => {
     </div>
   );
   const renderComponent = () => {
-    const commonProps = { businessProfile, masterData, suppliers, recordAudit, isAdmin };
+    const commonProps = { businessProfile, masterData, suppliers, parts, recordAudit, isAdmin };
     const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
 
     switch (selectedComponent) {

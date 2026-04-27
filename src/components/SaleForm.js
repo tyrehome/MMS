@@ -188,10 +188,40 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     if (invoice.discount_active && invoice.discount_value < 0) return alert("Enter a valid discount value.");
 
     setIsSubmitting(true);
+
+    // Calculate exact profit and item summary for ledger
+    let totalCost = 0;
+    const summaryParts = [];
+
+    invoice.items.forEach(item => {
+        let cost = 0;
+        let name = '';
+        if (item.type === 'tire') {
+            const tire = tires.find(t => t.id === item.tire_id);
+            cost = tire?.cost_price || 0;
+            name = `${tire?.brand} ${tire?.size}`;
+        } else if (item.type === 'part') {
+            const part = parts.find(p => p.id === item.part_id);
+            cost = part?.cost_price || 0;
+            name = part?.name;
+        } else {
+            // Services have 0 cost usually (pure profit)
+            cost = 0;
+            name = item.service_name;
+        }
+        totalCost += (Number(cost) * Number(item.quantity));
+        summaryParts.push(`${item.quantity}x ${name}`);
+    });
+
+    const calculatedProfit = calculateTotal() - totalCost;
+    const ledgerDescription = `POS Sale: ${summaryParts.slice(0, 3).join(', ')}${summaryParts.length > 3 ? '...' : ''}`;
+
     const saleData = { 
       ...invoice, 
       subtotal: calculateSubtotal(), 
       total: calculateTotal(),
+      profit: calculatedProfit,
+      ledger_description: ledgerDescription,
       discount_amount: calculateDiscount(),
       currency 
     };

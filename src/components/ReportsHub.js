@@ -93,11 +93,14 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], businessProfile, re
                 if (item.tire_id) {
                     const tire = tires.find(t => t.id === item.tire_id);
                     if (tire) cogs += (parseFloat(tire.cost_price || 0) * parseInt(item.quantity || 0));
+                } else if (item.part_id) {
+                    const part = (parts || []).find(p => p.id === item.part_id);
+                    if (part) cogs += (parseFloat(part.cost_price || 0) * parseInt(item.quantity || 0));
                 }
             });
         });
         return { revenue, cogs, grossProfit: revenue - cogs };
-    }, [sales, tires]);
+    }, [sales, tires, parts]);
 
     const movingData = useMemo(() => {
         const counts = {};

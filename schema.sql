@@ -376,7 +376,7 @@ BEGIN
                     'date', COALESCE(sale_payload->>'date', to_char(NOW(), 'YYYY-MM-DD')),
                     'type', 'Credit Sale',
                     'amount', (sale_payload->>'total')::NUMERIC,
-                    'description', 'POS Invoice #' || SUBSTRING(new_sale_id::TEXT FROM 1 FOR 8)
+                    'description', COALESCE(sale_payload->>'ledger_description', 'POS Invoice #' || SUBSTRING(new_sale_id::TEXT FROM 1 FOR 8))
                 )
             )
         WHERE id = (sale_payload->>'account_id')::UUID;
