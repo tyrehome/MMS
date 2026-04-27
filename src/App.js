@@ -394,11 +394,12 @@ const AppContent = () => {
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
       recordAudit('Process Sale', { 
-        customer: invoice.customer_name, 
-        vehicle: invoice.vehicle_number,
+        customer: invoice.customer_name || 'Walk-in', 
+        vehicle: invoice.vehicle_number || 'N/A',
         items: invoice.items.length,
         total: invoice.total,
-        payment: invoice.payment_method
+        payment: invoice.payment_method,
+        account_id: invoice.account_id || 'Cash Transaction'
       }, 'sales');
       return { success: true, data };
     } catch (e) {
@@ -622,7 +623,7 @@ const AppContent = () => {
         return <WorkerTracking workersList={workers || []} tasksList={tasks || []} setBillingDraft={setBillingDraft} setSelectedComponent={setSelectedComponent} {...commonProps} />;
       
       case "Finance": 
-        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} {...commonProps} /> : posComponent;
+        return isAdmin ? <Reports tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
       
       case "Suppliers":
         return isAdmin ? <SupplierManagement suppliers={suppliers || []} updateSupplier={updateSupplier} deleteSupplier={deleteSupplier} {...commonProps} /> : posComponent;

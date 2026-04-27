@@ -84,12 +84,24 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     }, null);
   };
 
+  const getExpiredUnitsForTire = (tireId) => {
+    return lotAging
+      .filter(l => l.tire_id === tireId && l.age_status === 'Expired')
+      .reduce((sum, l) => sum + parseInt(l.current_qty || 0), 0);
+  };
+
   const ageBadgeStyle = (status) => {
     if (status === 'Expired')       return { bg: '#ffebee', color: '#c62828', icon: '🔴', label: 'EXPIRED — Do Not Sell' };
     if (status === 'Critical')      return { bg: '#fff3e0', color: '#e65100', icon: '🟠', label: 'Urgent — Sell First!' };
     if (status === 'Expiring Soon') return { bg: '#fffde7', color: '#f57f17', icon: '🟡', label: 'Expiring Soon' };
     return null;
   };
+
+  const globalExpiredCount = React.useMemo(() => {
+    return lotAging
+      .filter(l => l.age_status === 'Expired')
+      .reduce((sum, l) => sum + parseInt(l.current_qty || 0), 0);
+  }, [lotAging]);
 
   const [invoice, setInvoice] = useState({
     customer_name: '', vehicle_number: '', date: new Date().toISOString().split('T')[0],
@@ -361,7 +373,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         {(!isMobile || (isMobile && mobileTab === 0)) && (
           <Grid item xs={12}>
           <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
-            <CardContent sx={{ p: 4 }}>
+            <CardContent sx={{ p: {xs: 2, md: 4} }}>
               <Grid container spacing={{xs: 2, md: 4}}>
                 <Grid item xs={12} sm={6} md={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -426,15 +438,31 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         {(!isMobile || (isMobile && mobileTab === 0)) && (
           <Grid item xs={12} md={7}>
           <Card sx={{ borderRadius: 4, minHeight: 600, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ p: {xs: 1.5, md: 3}, borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: {xs: 1, sm: 2}, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ 
+              p: {xs: 1, md: 3}, 
+              borderBottom: '1px solid rgba(0,0,0,0.05)', 
+              display: 'flex', 
+              gap: {xs: 1, sm: 2}, 
+              alignItems: 'center', 
+              overflowX: isMobile ? 'auto' : 'visible',
+              whiteSpace: isMobile ? 'nowrap' : 'normal',
+              pb: isMobile ? 1.5 : undefined,
+              '&::-webkit-scrollbar': { display: 'none' }
+            }}>
               <Button size="small" variant={selectedCategory === 'all' ? "contained" : "text"} onClick={() => setSelectedCategory('all')} sx={{ fontWeight: 800, borderRadius: 2, background: selectedCategory === 'all' ? 'linear-gradient(135deg,#1a237e,#311b92)' : undefined }}>All</Button>
               <Button size="small" variant={selectedCategory === 'tires' ? "contained" : "text"} onClick={() => setSelectedCategory('tires')} sx={{ fontWeight: 800, borderRadius: 2 }}>Tires</Button>
               <Button size="small" variant={selectedCategory === 'parts' ? "contained" : "text"} onClick={() => setSelectedCategory('parts')} sx={{ fontWeight: 800, borderRadius: 2 }}>Parts</Button>
               <Button size="small" variant={selectedCategory === 'services' ? "contained" : "text"} onClick={() => setSelectedCategory('services')} sx={{ fontWeight: 800, borderRadius: 2 }}>Services</Button>
-              <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: {sm: 'auto'}, width: {xs: '100%', sm: 'auto'}, '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
+              
+              {!isMobile && <TextField size="small" placeholder="Search catalog..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ ml: 'auto', width: 'auto', '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />}
             </Box>
+            {isMobile && (
+              <Box sx={{ px: 2, pb: 2 }}>
+                <TextField fullWidth size="small" placeholder="Search items..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcfc' } }} />
+              </Box>
+            )}
             {/* Item Config Bar */}
-            <Box sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.01)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+            <Box sx={{ p: {xs: 2, md: 3}, bgcolor: 'rgba(0,0,0,0.01)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
               <Grid container spacing={2} alignItems="flex-end">
                 <Grid item xs={12} sm={5}>
                   <Typography variant="caption" sx={{ fontWeight: 800, mb: 1, display: 'block' }}>SPEC & ASSIGNMENT</Typography>
@@ -482,8 +510,8 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               </Grid>
             </Box>
 
-            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', maxHeight: 600 }}>
-              <Grid container spacing={2}>
+            <Box sx={{ flexGrow: 1, p: {xs: 1.5, md: 3}, overflowY: 'auto', maxHeight: 600 }}>
+              <Grid container spacing={isMobile ? 1 : 2}>
 
                 {/* ───────── ALL TAB ───────── */}
                 {selectedCategory === 'all' && [
@@ -519,10 +547,11 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                                              { bg: 'rgba(76,175,80,0.10)', fg: '#2e7d32' };
                                              
                   const oldestLot = item.type === 'tire' ? getOldestLot(item.id) : null;
+                  const expiredUnits = item.type === 'tire' ? getExpiredUnitsForTire(item.id) : 0;
                   const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
 
                   return (
-                    <Grid item xs={12} sm={6} md={4} key={`${item.type}-${item.id}`}>
+                    <Grid item xs={6} sm={6} md={4} key={`${item.type}-${item.id}`}>
                       <Card
                         onClick={() => {
                           if (item.type === 'tire')    setNewItem({ ...newItem, type: 'tire',    tire_id: item.id,   price: item.price });
@@ -538,21 +567,28 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           transition: 'all 0.15s',
                         }}
                       >
-                        <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <CardContent sx={{ p: isMobile ? 1.5 : 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                             <Chip
                               label={item.type.toUpperCase()}
                               size="small"
                               sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: typeColor.bg, color: typeColor.fg }}
                             />
-                            {item.stock !== null && (
-                              <Chip
-                                label={`Stk: ${item.stock}`}
-                                size="small"
-                                color={item.stock <= 2 ? 'error' : item.stock <= 5 ? 'warning' : 'default'}
-                                sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }}
-                              />
-                            )}
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              {expiredUnits > 0 && (
+                                <Tooltip title="Total Expired Units">
+                                  <Chip label={`${expiredUnits} Expired`} size="small" sx={{ fontWeight:900, height:18, fontSize:'0.6rem', bgcolor:'#c62828', color:'#fff' }} />
+                                </Tooltip>
+                              )}
+                              {item.stock !== null && (
+                                <Chip
+                                  label={`Stk: ${item.stock}`}
+                                  size="small"
+                                  color={item.stock <= 2 ? 'error' : item.stock <= 5 ? 'warning' : 'default'}
+                                  sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }}
+                                />
+                              )}
+                            </Box>
                           </Box>
                           {item.image ? (
                             <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 1, position: 'relative' }}>
@@ -593,8 +629,8 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                               </Box>
                             )
                           )}
-                          <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.5 }}>{item.name}</Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{item.subtitle}</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.5, fontSize: isMobile ? '0.75rem' : '0.875rem', lineHeight: 1.2 }}>{item.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: isMobile ? '0.65rem' : '0.75rem' }}>{item.subtitle}</Typography>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, mb: 1, alignItems: 'center' }}>
                             <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: '0.85rem' }}>
                               {item.price > 0 ? `${item.price} ${currency}` : 'Set price'}
@@ -604,7 +640,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           <Button
                             fullWidth size="small" variant="contained"
                             startIcon={<AddIcon />}
-                            sx={{ mt: 'auto', borderRadius: 2, fontSize: '0.7rem' }}
+                            sx={{ mt: 'auto', borderRadius: 2, fontSize: '0.65rem', minWidth: 0, px: isMobile ? 1 : 2 }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (item.type === 'tire') {
@@ -627,73 +663,60 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                 {/* ───────── TIRES TAB ───────── */}
                 {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => {
                   const oldestLot = getOldestLot(t.id);
+                  const expiredUnits = getExpiredUnitsForTire(t.id);
                   const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
                   return (
-                  <Grid item xs={12} sm={6} md={4} key={t.id}>
+                  <Grid item xs={6} sm={6} md={4} key={t.id}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'tire', tire_id: t.id, price: t.price })} sx={{
-                      cursor: 'pointer', borderRadius: 4,
-                      border: newItem.tire_id === t.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      cursor: 'pointer', borderRadius: 3,
+                      border: newItem.tire_id === t.id ? '2px solid' : '1px solid rgba(0,0,0,0.07)',
                       borderColor: newItem.tire_id === t.id ? 'primary.main' : undefined,
-                      boxShadow: newItem.tire_id === t.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none',
-                      outline: badge && badge.color !== '#2e7d32' ? `2px solid ${badge.color}33` : undefined
+                      boxShadow: newItem.tire_id === t.id ? '0 6px 20px rgba(26,35,126,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s',
+                      height: '100%', display: 'flex', flexDirection: 'column'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
+                      <CardContent sx={{ p: isMobile ? 1.2 : 2, flex: 1, display: 'flex', flexDirection: 'column', '&:last-child': { pb: isMobile ? 1.2 : 2 } }}>
+                        {/* Image */}
                         {t.images && t.images.length > 0 ? (
-                          <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'relative' }}>
+                          <Box sx={{ width: '100%', aspectRatio: '1/1', borderRadius: 2, overflow: 'hidden', mb: 1, position: 'relative' }}>
                             <img src={t.images[0]} alt={t.brand} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             {badge && (
-                              <Box sx={{ 
-                                position: 'absolute', 
-                                bottom: 0, 
-                                left: 0, 
-                                right: 0, 
-                                p: 1, 
-                                background: `linear-gradient(to top, ${badge.bg}, transparent)`,
-                                backdropFilter: 'blur(4px)',
-                                borderTop: `1px solid ${badge.color}33`
-                              }}>
-                                <Typography sx={{ fontWeight: 900, fontSize: '0.65rem', color: badge.color, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  {badge.icon} {badge.label}
-                                </Typography>
-                                {oldestLot && (
-                                  <Typography variant="caption" sx={{ color: badge.color, opacity: 0.9, display:'block', mt:0.2, fontSize: '0.6rem', fontWeight: 700 }}>
-                                    Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
-                                  </Typography>
-                                )}
+                              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 0.5, bgcolor: badge.bg + 'dd' }}>
+                                <Typography sx={{ fontWeight: 900, fontSize: '0.6rem', color: badge.color, lineHeight: 1.1 }}>{badge.icon} {badge.label}</Typography>
                               </Box>
                             )}
                           </Box>
                         ) : (
                           badge && (
-                            <Box sx={{ mb: 1.5, p: 1, borderRadius: 2, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
-                              <Typography sx={{ fontWeight: 900, fontSize: '0.72rem', color: badge.color }}>
-                                {badge.icon} {badge.label}
-                              </Typography>
-                              {oldestLot && (
-                                <Typography variant="caption" sx={{ color: badge.color, opacity: 0.85, display:'block', mt:0.2, fontSize: '0.68rem', fontWeight: 700 }}>
-                                  Oldest: {oldestLot.age_years} yrs · {oldestLot.current_qty} units {oldestLot.dot_code ? `· DOT ${oldestLot.dot_code}` : ''}
-                                </Typography>
-                              )}
+                            <Box sx={{ mb: 1, p: 0.8, borderRadius: 1.5, bgcolor: badge.bg, border: `1px solid ${badge.color}33` }}>
+                              <Typography sx={{ fontWeight: 900, fontSize: '0.6rem', color: badge.color, lineHeight: 1.2 }}>{badge.icon} {badge.label}</Typography>
                             </Box>
                           )
                         )}
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{t.brand} {t.model} {t.size}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t.vehicle_type} · {t.tire_category}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5, alignItems: 'center' }}>
-                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{t.price} {currency}</Typography>
-                          <Chip label={`Stock: ${t.stock}`} size="small" sx={{ fontWeight: 900, height: 20 }} />
+                        {/* Name */}
+                        <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '0.72rem' : '0.85rem', lineHeight: 1.25, mb: 0.3 }}>{t.brand} {t.model}</Typography>
+                        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? '0.62rem' : '0.72rem', color: 'text.secondary', mb: 0.5 }}>{t.size}</Typography>
+                        <Typography sx={{ fontWeight: 500, fontSize: isMobile ? '0.58rem' : '0.65rem', color: 'text.disabled' }}>{t.vehicle_type} · {t.tire_category}</Typography>
+                        {/* Price + Stock */}
+                        <Box sx={{ mt: 'auto', pt: 1 }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: isMobile ? '0.85rem' : '1rem', lineHeight: 1 }}>{Number(t.price).toLocaleString()}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5, mb: 1 }}>
+                            <Typography sx={{ fontWeight: 700, fontSize: '0.6rem', color: 'text.secondary' }}>{currency}</Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              {expiredUnits > 0 && (
+                                <Chip label={`${expiredUnits} Exp!`} size="small" sx={{ fontWeight: 900, height: 16, fontSize: '0.55rem', bgcolor: '#c62828', color: '#fff', '& .MuiChip-label': { px: 0.5 } }} />
+                              )}
+                              <Chip label={`${t.stock}`} size="small" color={t.stock <= 0 ? 'error' : t.stock <= 3 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 16, fontSize: '0.6rem', '& .MuiChip-label': { px: 0.8 } }} />
+                            </Box>
+                          </Box>
+                          <Button
+                            fullWidth size="small" variant="contained"
+                            onClick={(e) => { e.stopPropagation(); setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire', tire_id: t.id, price: t.price, quantity: 1, id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] }); }}
+                            sx={{ borderRadius: 2, fontSize: isMobile ? '0.6rem' : '0.7rem', py: isMobile ? 0.5 : 0.8, minWidth: 0 }}
+                          >
+                            + Add
+                          </Button>
                         </Box>
-                        <Button
-                          fullWidth size="small" variant="contained"
-                          startIcon={<AddIcon />}
-                          sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'tire', tire_id: t.id, price: t.price, quantity: 1, id: `tire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
-                          }}
-                        >
-                          QUICK ADD
-                        </Button>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -702,37 +725,39 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
 
                 {/* ───────── PARTS TAB ───────── */}
                 {selectedCategory === 'parts' && parts.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                  <Grid item xs={12} sm={6} md={4} key={p.id}>
+                  <Grid item xs={6} sm={6} md={4} key={p.id}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'part', part_id: p.id, price: p.price })} sx={{
-                      cursor: 'pointer', borderRadius: 4,
-                      border: newItem.part_id === p.id ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
+                      cursor: 'pointer', borderRadius: 3,
+                      border: newItem.part_id === p.id ? '2px solid' : '1px solid rgba(0,0,0,0.07)',
                       borderColor: newItem.part_id === p.id ? 'primary.main' : undefined,
-                      boxShadow: newItem.part_id === p.id ? '0 10px 20px rgba(0,0,0,0.05)' : 'none'
+                      boxShadow: newItem.part_id === p.id ? '0 6px 20px rgba(26,35,126,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s',
+                      height: '100%', display: 'flex', flexDirection: 'column'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                          <Chip
-                            label={p.category || 'Part'}
-                            size="small"
-                            sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: 'rgba(245,0,87,0.08)', color: 'secondary.main' }}
-                          />
-                          <Chip label={`Stk: ${p.stock}`} size="small" color={p.stock <= 2 ? 'error' : p.stock <= 5 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }} />
+                      <CardContent sx={{ p: isMobile ? 1.2 : 2, flex: 1, display: 'flex', flexDirection: 'column', '&:last-child': { pb: isMobile ? 1.2 : 2 } }}>
+                        {/* Category badge */}
+                        <Chip
+                          label={p.category || 'Part'}
+                          size="small"
+                          sx={{ fontWeight: 900, height: 18, fontSize: '0.58rem', bgcolor: 'rgba(245,0,87,0.08)', color: 'secondary.main', alignSelf: 'flex-start', mb: 1 }}
+                        />
+                        {/* Name */}
+                        <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '0.72rem' : '0.85rem', lineHeight: 1.25, mb: 0.3, flex: 1 }}>{p.name}</Typography>
+                        {/* Price + Stock + Button */}
+                        <Box sx={{ mt: 'auto', pt: 1 }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: isMobile ? '0.85rem' : '1rem', lineHeight: 1 }}>{Number(p.price).toLocaleString()}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5, mb: 1 }}>
+                            <Typography sx={{ fontWeight: 700, fontSize: '0.6rem', color: 'text.secondary' }}>{currency}</Typography>
+                            <Chip label={`${p.stock}`} size="small" color={p.stock <= 2 ? 'error' : p.stock <= 5 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 16, fontSize: '0.6rem', '& .MuiChip-label': { px: 0.8 } }} />
+                          </Box>
+                          <Button
+                            fullWidth size="small" variant="contained" color="secondary"
+                            onClick={(e) => { e.stopPropagation(); setInvoice({ ...invoice, items: [...invoice.items, { type: 'part', part_id: p.id, price: p.price, quantity: 1, id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] }); }}
+                            sx={{ borderRadius: 2, fontSize: isMobile ? '0.6rem' : '0.7rem', py: isMobile ? 0.5 : 0.8, minWidth: 0 }}
+                          >
+                            + Add
+                          </Button>
                         </Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.5 }}>{p.name}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, alignItems: 'center' }}>
-                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.price} {currency}</Typography>
-                        </Box>
-                        <Button
-                          fullWidth size="small" variant="contained"
-                          startIcon={<AddIcon />}
-                          sx={{ mt: 1, borderRadius: 2, fontSize: '0.7rem' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInvoice({ ...invoice, items: [...invoice.items, { type: 'part', part_id: p.id, price: p.price, quantity: 1, id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }] });
-                          }}
-                        >
-                          QUICK ADD
-                        </Button>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -740,13 +765,13 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
 
                 {/* ───────── SERVICES TAB ───────── */}
                 {selectedCategory === 'services' && services.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
-                  <Grid item xs={12} sm={6} md={4} key={s}>
+                  <Grid item xs={6} sm={6} md={4} key={s}>
                     <Card onClick={() => setNewItem({ ...newItem, type: 'service', service_name: s })} sx={{
-                      cursor: 'pointer', borderRadius: 4, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', borderRadius: 4, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                       border: newItem.service_name === s ? '2px solid' : '1px solid rgba(0,0,0,0.05)',
                       borderColor: newItem.service_name === s ? 'primary.main' : undefined,
                     }}>
-                      <Typography sx={{ fontWeight: 900 }}>{s}</Typography>
+                      <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '0.75rem' : '1rem', textAlign: 'center', px: 1 }}>{s}</Typography>
                       <Button
                         size="small" variant="contained"
                         startIcon={<AddIcon />}
@@ -799,6 +824,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                                 const tire = tires.find(t => t.id === item.tire_id);
                                 if (!tire) return 'Unknown Tire';
                                 const oldestLot = getOldestLot(tire.id);
+                                const expiredUnits = getExpiredUnitsForTire(tire.id);
                                 const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
                                 return (
                                   <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -903,7 +929,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               
               <Divider sx={{ my: 1.5, borderColor: 'rgba(0,0,0,0.05)' }} />
               
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2, px: 2 }}>
                 <Typography sx={{ fontWeight: 800, color: '#1e293b', fontSize: '1.1rem' }}>Total</Typography>
                 <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: '1.4rem', lineHeight: 1 }}>
                   {calculateTotal().toLocaleString()} <Typography component="span" sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 700 }}>{currency}</Typography>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import {
   Box, Typography, TextField, Button, Select, MenuItem, FormControl, InputLabel,
-  Grid, Card, CardContent, CardActions, IconButton, Snackbar, Alert, Tabs, Tab, Chip, Divider
+  Grid, Card, CardContent, CardActions, IconButton, Snackbar, Alert, Tabs, Tab, Chip, Divider, useMediaQuery, useTheme
 } from "@mui/material";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider, DatePicker, TimePicker } from "@mui/x-date-pickers";
-import { Edit, Delete, CheckCircle, EventNote, PictureAsPdf, Phone } from "@mui/icons-material";
+import { Edit, Delete, CheckCircle, EventNote, PictureAsPdf, Phone, Add as AddIcon } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { Calendar, momentLocalizer } from "react-big-calendar";
@@ -25,6 +25,8 @@ const services_list = [
 ];
 
 const AppointmentSystem = ({ appointmentsList = [], vehiclesList = [] }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [appointments, setAppointments] = useState(appointmentsList);
 
   useEffect(() => {
@@ -132,21 +134,23 @@ const AppointmentSystem = ({ appointmentsList = [], vehiclesList = [] }) => {
       <Tabs
         value={tabValue}
         onChange={(e, v) => setTabValue(v)}
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
         sx={{
           mb: 4,
           '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
-          '& .MuiTab-root': { fontWeight: 700, fontSize: '0.95rem', textTransform: 'none' }
+          '& .MuiTab-root': { fontWeight: 700, fontSize: isMobile ? '0.85rem' : '0.95rem', textTransform: 'none' }
         }}
       >
-        <Tab label="Booking Entry" />
-        <Tab label="Appointment List" />
-        <Tab label="Calendar View" />
-        <Tab label="Service Reminders" />
+        <Tab icon={isMobile ? <AddIcon /> : null} iconPosition="start" label="Booking" />
+        <Tab icon={isMobile ? <EventNote /> : null} iconPosition="start" label="Log" />
+        <Tab icon={isMobile ? <Edit /> : null} iconPosition="start" label="Calendar" />
+        <Tab icon={isMobile ? <Phone /> : null} iconPosition="start" label="Reminders" />
       </Tabs>
 
       {tabValue === 0 && (
         <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.02)' }}>
-          <CardContent sx={{ p: 4 }}>
+          <CardContent sx={{ p: isMobile ? 2 : 4 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, color: 'primary.main' }}>Create Reservation</Typography>
             <form onSubmit={handleSubmit}>
               <Grid container spacing={3}>
@@ -194,8 +198,8 @@ const AppointmentSystem = ({ appointmentsList = [], vehiclesList = [] }) => {
       {
         tabValue === 1 && (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-              <FormControl sx={{ minWidth: 200 }}>
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', mb: 4, gap: 2 }}>
+              <FormControl sx={{ minWidth: isMobile ? '100%' : 200 }}>
                 <InputLabel>Filter Status</InputLabel>
                 <Select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} label="Filter Status" sx={{ borderRadius: 3 }}>
                   <MenuItem value="">All Statuses</MenuItem>
@@ -249,7 +253,7 @@ const AppointmentSystem = ({ appointmentsList = [], vehiclesList = [] }) => {
       {
         tabValue === 2 && (
           <Card sx={{ borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <Box sx={{ p: 3, height: 700 }}>
+            <Box sx={{ p: isMobile ? 1 : 3, height: isMobile ? 500 : 700 }}>
               <Calendar localizer={localizer} events={calendarEvents} startAccessor="start" endAccessor="end" style={{ height: "100%" }} />
             </Box>
           </Card>

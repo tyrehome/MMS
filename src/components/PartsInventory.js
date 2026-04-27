@@ -3,7 +3,8 @@ import {
     Typography, Grid, TextField, Button, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Box, Chip, Card,
     Avatar, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-    Select, MenuItem, FormControl, InputLabel, LinearProgress, Tooltip, useMediaQuery
+    Select, MenuItem, FormControl, InputLabel, LinearProgress, Tooltip, useMediaQuery,
+    Divider, Paper
 } from '@mui/material';
 import {
     LocalHospital as PatchIcon,
@@ -158,60 +159,42 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
             </Box>
 
             {/* Stats Row */}
-            <Grid container spacing={isMobile ? 1.5 : 2} sx={{ mb: 3 }}>
-                <Grid item xs={6} sm={3}>
-                    <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(26,35,126,0.04) 0%, rgba(26,35,126,0.10) 100%)' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <StockIcon sx={{ color: 'primary.main', fontSize: isMobile ? 16 : 20 }} />
-                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Total SKUs</Typography>
-                        </Box>
-                        <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>{totalSKUs}</Typography>
-                    </Card>
-                </Grid>
-
-                <Grid item xs={6} sm={3}>
-                    <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(76,175,80,0.04) 0%, rgba(76,175,80,0.12) 100%)' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <StockIcon sx={{ color: 'success.main', fontSize: isMobile ? 16 : 20 }} />
-                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Stock Units</Typography>
-                        </Box>
-                        <Typography variant={isMobile ? "h4" : "h3"} sx={{ fontWeight: 900, color: 'success.main', lineHeight: 1 }}>{totalStock.toLocaleString()}</Typography>
-                    </Card>
-                </Grid>
-
-                {isAdmin ? (
-                    <>
-                        <Grid item xs={6} sm={3}>
-                            <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(245,0,87,0.04) 0%, rgba(245,0,87,0.12) 100%)' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <ValueIcon sx={{ color: 'secondary.main', fontSize: isMobile ? 16 : 20 }} />
-                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Stock Value</Typography>
-                                </Box>
-                                <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 900, color: 'secondary.main', lineHeight: 1.2 }}>{totalValue.toLocaleString()}</Typography>
-                                <Typography variant="caption" sx={{ opacity: 0.6, fontSize: '0.6rem' }}>{currency}</Typography>
-                            </Card>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <Card sx={{ borderRadius: 4, p: isMobile ? 2 : 3, background: 'linear-gradient(135deg, rgba(230,81,0,0.04) 0%, rgba(230,81,0,0.14) 100%)' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <ProfitIcon sx={{ color: '#e65100', fontSize: isMobile ? 16 : 20 }} />
-                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>Potential Profit</Typography>
-                                </Box>
-                                <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 900, color: '#e65100', lineHeight: 1.2 }}>{totalProfit.toLocaleString()}</Typography>
-                                <Typography variant="caption" sx={{ opacity: 0.6, fontSize: '0.6rem' }}>{currency} · {avgMargin}% avg</Typography>
-                            </Card>
-                        </Grid>
-                    </>
-                ) : (
-                    <Grid item xs={12} sm={6}>
-                        <Card sx={{ borderRadius: 4, p: 3, background: 'linear-gradient(135deg, rgba(26,35,126,0.04) 0%, rgba(49,27,146,0.10) 100%)' }}>
-                            <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48, mb: 1 }}><PatchIcon /></Avatar>
-                            <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase' }}>Lifetime Patches</Typography>
-                            <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main' }}>{patchCount}</Typography>
-                        </Card>
-                    </Grid>
-                )}
-            </Grid>
+            {/* Stats Row */}
+            <Box sx={{ 
+              display: 'flex', 
+              gap: 1.5, 
+              mb: 3, 
+              overflowX: isMobile ? 'auto' : 'visible',
+              pb: isMobile ? 1 : 0,
+              width: isMobile ? 'calc(100% + 0px)' : '100%',
+              '&::-webkit-scrollbar': { display: 'none' }
+            }}>
+                {[
+                  { label: 'Total SKUs',   value: totalSKUs,   icon: <StockIcon />,  color: 'primary.main',   bg: 'rgba(26,35,126,0.06)' },
+                  { label: 'Stock Units',  value: totalStock,  icon: <StockIcon />,  color: 'success.main',   bg: 'rgba(76,175,80,0.08)' },
+                  { label: 'Stock Value',  value: totalValue,  icon: <ValueIcon />,  color: 'secondary.main', bg: 'rgba(245,0,87,0.08)', isPrice: true },
+                  { label: 'Avg Margin',   value: avgMargin,   icon: <ProfitIcon />, color: '#e65100',        bg: 'rgba(230,81,0,0.10)', isPct: true },
+                ].map(s => (
+                  <Card key={s.label} sx={{ 
+                    minWidth: isMobile ? 130 : 'auto', 
+                    flex: isMobile ? '0 0 auto' : 1,
+                    borderRadius: 4, 
+                    p: isMobile ? 2 : 2.5, 
+                    background: s.bg,
+                    border: '1px solid rgba(0,0,0,0.03)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      {React.cloneElement(s.icon, { sx: { fontSize: 16, color: s.color } })}
+                      <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}>{s.label}</Typography>
+                    </Box>
+                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 900, color: s.color, lineHeight: 1.1 }}>
+                      {s.isPrice ? s.value.toLocaleString() : s.value}
+                      {s.isPct ? '%' : ''}
+                    </Typography>
+                  </Card>
+                ))}
+            </Box>
 
             <Grid container spacing={3}>
                 {/* ── Register Component Form ── */}
@@ -354,7 +337,85 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                             </Box>
                         </Box>
 
-                        <TableContainer sx={{ overflowX: 'auto' }}>
+                        {isMobile ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
+                                {filteredParts.map(p => {
+                                    const ppu = profitPerUnit(p);
+                                    const margin = marginPct(p);
+                                    const isHigh = margin >= 40;
+                                    const isLow = margin < 20 && p.price > 0;
+                                    const barColor = isHigh ? 'success.main' : isLow ? 'error.main' : 'warning.main';
+
+                                    return (
+                                        <Card key={p.id} variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box>
+                                                    <Typography sx={{ fontWeight: 800, color: 'primary.main' }}>{p.name}</Typography>
+                                                    <Chip
+                                                        label={p.category}
+                                                        size="small"
+                                                        sx={{
+                                                            mt: 0.5, fontWeight: 900, borderRadius: 1.5, fontSize: '0.65rem', height: 18,
+                                                            bgcolor: `${getCategoryColor(p.category)}12`,
+                                                            color: getCategoryColor(p.category),
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ textAlign: 'right' }}>
+                                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>STOCK</Typography>
+                                                    <Chip label={p.stock} size="small" color={p.stock <= 2 ? 'error' : p.stock <= 5 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 20 }} />
+                                                </Box>
+                                            </Box>
+
+                                            <Divider sx={{ my: 1.5, opacity: 0.5 }} />
+
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>SELL PRICE</Typography>
+                                                    <Typography sx={{ fontWeight: 800 }}>{(p.price || 0).toLocaleString()} {currency}</Typography>
+                                                </Grid>
+                                                {isAdmin && (
+                                                    <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                                                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>VALUATION</Typography>
+                                                        <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{((p.stock || 0) * (p.price || 0)).toLocaleString()} {currency}</Typography>
+                                                    </Grid>
+                                                )}
+                                                {isAdmin && (
+                                                    <Grid item xs={12}>
+                                                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <Box>
+                                                                <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>MARGIN</Typography>
+                                                                <Typography sx={{ fontWeight: 900, color: barColor }}>{margin.toFixed(1)}%</Typography>
+                                                            </Box>
+                                                            <Box sx={{ textAlign: 'right' }}>
+                                                                <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>PROFIT/UNIT</Typography>
+                                                                <Typography sx={{ fontWeight: 900, color: ppu >= 0 ? 'success.main' : 'error.main' }}>
+                                                                    {ppu >= 0 ? '+' : ''}{ppu.toLocaleString()}
+                                                                </Typography>
+                                                            </Box>
+                                                        </Box>
+                                                    </Grid>
+                                                )}
+                                            </Grid>
+
+                                            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                                                <Button
+                                                    fullWidth variant="outlined" size="small" startIcon={<EditIcon />}
+                                                    onClick={() => { setEditPart({ ...p, cost_price: p.cost_price || 0 }); setIsEditDialogOpen(true); }}
+                                                    sx={{ borderRadius: 2.5, fontWeight: 800, py: 1 }}
+                                                >
+                                                    EDIT
+                                                </Button>
+                                                <IconButton color="error" onClick={() => handleDeletePart(p.id)} sx={{ bgcolor: 'rgba(244,67,54,0.05)', borderRadius: 2.5, width: 44 }}>
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        </Card>
+                                    );
+                                })}
+                            </Box>
+                        ) : (
+                            <TableContainer sx={{ overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                     <TableRow>
@@ -474,6 +535,7 @@ const PartsInventory = ({ businessProfile, partsProps = [], salesProps = [] }) =
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        )}
                     </Card>
                 </Grid>
             </Grid>

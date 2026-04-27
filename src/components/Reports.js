@@ -5,7 +5,7 @@ import {
     Chip, TextField, InputAdornment, Button, IconButton,
     Collapse, Avatar, MenuItem, Select, FormControl, InputLabel,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Snackbar, Alert, useMediaQuery
+    Snackbar, Alert, useMediaQuery, Divider
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -98,7 +98,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
     };
 
     useEffect(() => {
-        if (hubTab === 3) {
+        if (hubTab === 4) {
             fetchAuditLogs();
             
             // Realtime listener for audit logs
@@ -217,26 +217,39 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
 
     return (
         <Box sx={{ p: isMobile ? 0 : 2 }}>
-            <Box sx={{ mb: isMobile ? 3 : 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
+            <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap: isMobile ? 2 : 3 }}>
                 <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Finance & Ledger Hub</Typography>
+                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>Finance & Ledger Hub</Typography>
                     <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, display: {xs: 'none', sm: 'block'} }}>Automated financial reporting & operational audit trails</Typography>
                 </Box>
                 
                 {/* Global Stats Header - Quick Access */}
-                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, width: isMobile ? '100%' : 'auto' }}>
-                    <Card sx={{ bgcolor: 'primary.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>REVENUE (TO DATE)</Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{pandLData.revenue.toLocaleString()} {currency}</Typography>
-                    </Card>
-                    <Card sx={{ bgcolor: 'error.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>TOTAL PAYABLES</Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{suppliers.reduce((s, a) => s + Number(a.payable_balance || 0), 0).toLocaleString()} {currency}</Typography>
-                    </Card>
-                    <Card sx={{ bgcolor: 'warning.main', color: '#fff', borderRadius: 4, px: 2, py: 1.5, minWidth: 160 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block' }}>RECEIVABLES</Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 900 }}>{accounts.reduce((s, a) => s + Number(a.receivable || 0), 0).toLocaleString()} {currency}</Typography>
-                    </Card>
+                <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1.5, 
+                    overflowX: isMobile ? 'auto' : 'visible', 
+                    pb: isMobile ? 1 : 0,
+                    width: isMobile ? 'calc(100% + 0px)' : 'auto',
+                    '&::-webkit-scrollbar': { display: 'none' } 
+                }}>
+                    {[
+                        { label: 'REVENUE', value: pandLData.revenue, color: 'primary.main' },
+                        { label: 'PAYABLES', value: suppliers.reduce((s, a) => s + Number(a.payable_balance || 0), 0), color: 'error.main' },
+                        { label: 'RECEIVABLES', value: accounts.reduce((s, a) => s + Number(a.receivable || 0), 0), color: 'warning.main' }
+                    ].map((stat, i) => (
+                        <Card key={i} sx={{ 
+                            minWidth: isMobile ? 140 : 180, 
+                            bgcolor: stat.color, 
+                            color: '#fff', 
+                            borderRadius: 3, 
+                            px: 2, 
+                            py: 1.2,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}>
+                            <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.8, display: 'block', fontSize: '0.6rem' }}>{stat.label}</Typography>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 900, whiteSpace: 'nowrap' }}>{stat.value.toLocaleString()} <Typography component="span" sx={{ fontSize: '0.65rem', opacity: 0.7 }}>{currency}</Typography></Typography>
+                        </Card>
+                    ))}
                 </Box>
             </Box>
 
@@ -247,17 +260,23 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                 scrollButtons={isMobile ? "auto" : false}
                 sx={{ mb: 4, borderBottom: '1px solid rgba(0,0,0,0.05)', '& .MuiTab-root': { fontWeight: 800, textTransform: 'none', fontSize: isMobile ? '0.85rem' : '1rem' } }}
             >
-                <Tab label="P&L Analytics" />
-                <Tab label="Inventory Valuation" />
-                <Tab label="Sales History" />
-                <Tab label="Vendor Status" />
-                <Tab label="Audit Trail" />
+                <Tab label={isMobile ? "P&L" : "P&L Analytics"} />
+                <Tab label={isMobile ? "Valuation" : "Inventory Valuation"} />
+                <Tab label={isMobile ? "Sales" : "Sales History"} />
+                <Tab label={isMobile ? "Vendor" : "Vendor Status"} />
+                <Tab label={isMobile ? "Audit" : "Audit Trail"} />
             </Tabs>
 
             {/* TAB 0: Performance Analytics */}
             {hubTab === 0 && (
                 <Box>
-                    <Tabs value={reportTab} onChange={(e, v) => setReportTab(v)} sx={{ mb: 3, '& .MuiTab-root': { fontWeight: 700, fontSize: '0.85rem' } }}>
+                    <Tabs 
+                        value={reportTab} 
+                        onChange={(e, v) => setReportTab(v)} 
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons={isMobile ? "auto" : false}
+                        sx={{ mb: 3, '& .MuiTab-root': { fontWeight: 700, fontSize: '0.85rem' } }}
+                    >
                         <Tab label="Profit & Loss" />
                         <Tab label="Stock Evaluation" />
                         <Tab label="Velocity" />
@@ -272,9 +291,12 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                             ].map((s, i) => (
                                 <Grid item xs={12} md={4} key={i}>
                                     <Card sx={{ borderRadius: 4, background: s.bg, color: s.dark ? '#fff' : 'inherit', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                        <CardContent sx={{ p: 4 }}>
+                                        <CardContent sx={{ p: isMobile ? 3 : 4 }}>
                                             <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.8 }}>{s.label}</Typography>
-                                            <Typography variant="h4" sx={{ fontWeight: 900, color: s.color, mt: 1 }}>{s.value.toLocaleString()} <Typography component="span" variant="h6" sx={{ opacity: 0.6 }}>{currency}</Typography></Typography>
+                                            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 900, color: s.color, mt: 1 }}>
+                                                {s.value.toLocaleString()} 
+                                                <Typography component="span" variant={isMobile ? "body1" : "h6"} sx={{ opacity: 0.6, ml: 1 }}>{currency}</Typography>
+                                            </Typography>
                                         </CardContent>
                                     </Card>
                                 </Grid>
@@ -283,7 +305,30 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                     )}
 
                     {reportTab === 1 && (
-                        <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
+                        isMobile ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {tires.map(t => (
+                                    <Card key={t.id} variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
+                                        <Typography sx={{ fontWeight: 800, color: 'primary.main', mb: 1 }}>{t.brand} {t.size}</Typography>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={4}>
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>STOCK</Typography>
+                                                <Typography sx={{ fontWeight: 700 }}>{t.stock}</Typography>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>COST</Typography>
+                                                <Typography sx={{ fontWeight: 700 }}>{(t.cost_price || 0).toLocaleString()}</Typography>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>VALUATION</Typography>
+                                                <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{((t.stock || 0) * (t.cost_price || 0)).toLocaleString()}</Typography>
+                                            </Grid>
+                                        </Grid>
+                                    </Card>
+                                ))}
+                            </Box>
+                        ) : (
+                            <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none', overflowX: 'auto' }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                     <TableRow>
@@ -305,6 +350,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                    )
                     )}
 
                     {reportTab === 2 && (
@@ -341,18 +387,18 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                         <Grid container spacing={3} sx={{ mb: 4 }}>
                             {[
                                 { label: 'Total Sales', value: totals.count + ' Transactions', icon: <CartIcon />, bg: 'rgba(26,35,126,0.04)', color: 'primary.main' },
-                                { label: 'Cash & Card Revenue', value: totals.cash.toLocaleString() + ' ' + currency, icon: <CashIcon />, bg: 'rgba(76,175,80,0.05)', color: 'success.main' },
-                                { label: 'Customer Credit (Deferred)', value: totals.credit.toLocaleString() + ' ' + currency, icon: <CreditIcon />, bg: 'rgba(255,152,0,0.05)', color: 'warning.main' },
+                                { label: 'Revenue', value: totals.cash.toLocaleString() + ' ' + currency, icon: <CashIcon />, bg: 'rgba(76,175,80,0.05)', color: 'success.main' },
+                                { label: 'Credit (Deferred)', value: totals.credit.toLocaleString() + ' ' + currency, icon: <CreditIcon />, bg: 'rgba(255,152,0,0.05)', color: 'warning.main' },
                                 { label: 'Grand Total', value: totals.total.toLocaleString() + ' ' + currency, icon: <ReceiptIcon />, bg: 'linear-gradient(135deg, #1a237e 0%, #311b92 100%)', color: '#fff', dark: true },
                             ].map((s, i) => (
                                 <Grid item xs={12} sm={6} md={3} key={i}>
                                     <Card sx={{ borderRadius: 4, background: s.bg, border: '1px solid rgba(0,0,0,0.05)' }}>
-                                        <CardContent sx={{ p: 3 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                                                <Typography variant="caption" sx={{ fontWeight: 900, color: s.dark ? 'rgba(255,255,255,0.7)' : 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>{s.label}</Typography>
-                                                <Avatar sx={{ bgcolor: s.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)', color: s.color, width: 36, height: 36 }}>{s.icon}</Avatar>
+                                        <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1 : 1.5 }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 900, color: s.dark ? 'rgba(255,255,255,0.7)' : 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}>{s.label}</Typography>
+                                                <Avatar sx={{ bgcolor: s.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)', color: s.color, width: 32, height: 32 }}>{React.cloneElement(s.icon, { sx: { fontSize: 18 } })}</Avatar>
                                             </Box>
-                                            <Typography variant="h6" sx={{ fontWeight: 900, color: s.dark ? '#fff' : s.color }}>{s.value}</Typography>
+                                            <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ fontWeight: 900, color: s.dark ? '#fff' : s.color }}>{s.value}</Typography>
                                         </CardContent>
                                     </Card>
                                 </Grid>
@@ -406,136 +452,243 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                     {reportTab === 1 && (
                         <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>Daily Summary</Typography>
-                            <Card sx={{ borderRadius: 4, mb: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                <TableContainer sx={{ overflowX: 'auto' }}>
-                                    <Table>
-                                        <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 900, py: 2.5 }}>DATE</TableCell>
-                                                <TableCell sx={{ fontWeight: 900 }}>TRANSACTIONS</TableCell>
-                                                <TableCell sx={{ fontWeight: 900, color: 'success.main' }}>CASH / CARD</TableCell>
-                                                <TableCell sx={{ fontWeight: 900, color: 'warning.main' }}>CREDIT</TableCell>
-                                                <TableCell sx={{ fontWeight: 900 }}>DAY TOTAL</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {dailySummary.length === 0 && (
-                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>No sales found for the selected filter.</TableCell></TableRow>
-                                            )}
-                                            {dailySummary.map((day, i) => (
-                                                <TableRow key={i} hover>
-                                                    <TableCell sx={{ fontWeight: 800 }}>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                                            {day.date}
-                                                        </Box>
-                                                    </TableCell>
-                                                    <TableCell><Chip label={`${day.count} sales`} size="small" sx={{ fontWeight: 800 }} /></TableCell>
-                                                    <TableCell sx={{ fontWeight: 800, color: 'success.main' }}>{day.cash.toLocaleString()} {currency}</TableCell>
-                                                    <TableCell sx={{ fontWeight: 800, color: 'warning.main' }}>{day.credit.toLocaleString()} {currency}</TableCell>
-                                                    <TableCell sx={{ fontWeight: 900, fontSize: '1rem' }}>{day.total.toLocaleString()} {currency}</TableCell>
+                            {isMobile ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {dailySummary.map((day, i) => (
+                                        <Card key={i} sx={{ borderRadius: 3, p: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <CalendarIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                                                    <Typography sx={{ fontWeight: 900 }}>{day.date}</Typography>
+                                                </Box>
+                                                <Chip label={`${day.count} sales`} size="small" sx={{ fontWeight: 800 }} />
+                                            </Box>
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>CASH / CARD</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: 'success.main' }}>{day.cash.toLocaleString()} {currency}</Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>CREDIT</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: 'warning.main' }}>{day.credit.toLocaleString()} {currency}</Typography>
+                                                </Grid>
+                                                <Grid item xs={12}>
+                                                    <Divider sx={{ my: 1, opacity: 0.5 }} />
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Total Day Revenue</Typography>
+                                                        <Typography sx={{ fontWeight: 900, fontSize: '1.1rem', color: 'primary.main' }}>{day.total.toLocaleString()} {currency}</Typography>
+                                                    </Box>
+                                                </Grid>
+                                            </Grid>
+                                        </Card>
+                                    ))}
+                                    {dailySummary.length === 0 && (
+                                        <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                                            <Typography sx={{ fontWeight: 700 }}>No sales found.</Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            ) : (
+                                <Card sx={{ borderRadius: 4, mb: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                    <TableContainer sx={{ overflowX: 'auto' }}>
+                                        <Table>
+                                            <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 900, py: 2.5 }}>DATE</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900 }}>TRANSACTIONS</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900, color: 'success.main' }}>CASH / CARD</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900, color: 'warning.main' }}>CREDIT</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900 }}>DAY TOTAL</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Card>
+                                            </TableHead>
+                                            <TableBody>
+                                                {dailySummary.length === 0 && (
+                                                    <TableRow><TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>No sales found for the selected filter.</TableCell></TableRow>
+                                                )}
+                                                {dailySummary.map((day, i) => (
+                                                    <TableRow key={i} hover>
+                                                        <TableCell sx={{ fontWeight: 800 }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                                                {day.date}
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell><Chip label={`${day.count} sales`} size="small" sx={{ fontWeight: 800 }} /></TableCell>
+                                                        <TableCell sx={{ fontWeight: 800, color: 'success.main' }}>{day.cash.toLocaleString()} {currency}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 800, color: 'warning.main' }}>{day.credit.toLocaleString()} {currency}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 900, fontSize: '1rem' }}>{day.total.toLocaleString()} {currency}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Card>
+                            )}
                         </Box>
                     )}
 
                     {reportTab === 2 && (
                         <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>All Transactions ({filteredSales.length})</Typography>
-                            <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                <TableContainer sx={{ overflowX: 'auto' }}>
-                                    <Table>
-                                        <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 900, py: 2.5, width: 40 }} />
-                                                <TableCell sx={{ fontWeight: 900 }}>DATE & TIME</TableCell>
-                                                <TableCell sx={{ fontWeight: 900 }}>CUSTOMER</TableCell>
-                                                <TableCell sx={{ fontWeight: 900 }}>VEHICLE</TableCell>
-                                                <TableCell sx={{ fontWeight: 900 }}>PAYMENT</TableCell>
-                                                <TableCell sx={{ fontWeight: 900, textAlign: 'right' }}>TOTAL</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {filteredSales.length === 0 && (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>No transactions found.</TableCell></TableRow>
-                                            )}
-                                            {filteredSales.map(sale => (
-                                                <React.Fragment key={sale.id}>
-                                                    <TableRow
-                                                        hover
-                                                        sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(26,35,126,0.02)' } }}
-                                                        onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
-                                                    >
-                                                        <TableCell>
-                                                            <IconButton size="small">
-                                                                {expandedSale === sale.id ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
-                                                            </IconButton>
-                                                        </TableCell>
-                                                        <TableCell sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                                                            {sale.created_at ? new Date(sale.created_at).toLocaleString() : '—'}
-                                                        </TableCell>
-                                                        <TableCell sx={{ fontWeight: 800 }}>{sale.customer_name || '—'}</TableCell>
-                                                        <TableCell sx={{ color: 'text.secondary' }}>{sale.vehicle_number || '—'}</TableCell>
-                                                        <TableCell>
-                                                            <Chip
-                                                                label={sale.payment_method}
-                                                                size="small"
-                                                                color={paymentColor(sale.payment_method)}
-                                                                sx={{ fontWeight: 800, borderRadius: 2 }}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontWeight: 900, fontSize: '1rem', color: 'primary.main' }}>
-                                                            {parseFloat(sale.total || 0).toLocaleString()} {currency}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                    {/* Expandable Item Details */}
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} sx={{ py: 0, borderBottom: expandedSale === sale.id ? undefined : 'none' }}>
-                                                            <Collapse in={expandedSale === sale.id} timeout="auto" unmountOnExit>
-                                                                <Box sx={{ p: 3, bgcolor: 'rgba(26,35,126,0.02)', borderRadius: 3, m: 1 }}>
-                                                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-                                                                        Invoice Items — Ref: {sale.id?.slice(0, 8).toUpperCase()}
-                                                                    </Typography>
-                                                                    <Table size="small" sx={{ mt: 1.5 }}>
-                                                                        <TableHead>
-                                                                            <TableRow>
-                                                                                <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>ITEM</TableCell>
-                                                                                <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>QTY</TableCell>
-                                                                                <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>UNIT PRICE</TableCell>
-                                                                                <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem', textAlign: 'right' }}>SUBTOTAL</TableCell>
-                                                                            </TableRow>
-                                                                        </TableHead>
-                                                                        <TableBody>
-                                                                            {(sale.sale_items || []).map(item => {
-                                                                                const tire = item.tire_id ? tires.find(t => t.id === item.tire_id) : null;
-                                                                                return (
-                                                                                    <TableRow key={item.id}>
-                                                                                        <TableCell sx={{ fontWeight: 700, py: 0.75 }}>{tire ? `${tire.brand} ${tire.size}` : (item.service_name || 'Service')}</TableCell>
-                                                                                        <TableCell sx={{ py: 0.75 }}>{item.quantity}</TableCell>
-                                                                                        <TableCell sx={{ py: 0.75 }}>{parseFloat(item.price || 0).toLocaleString()} {currency}</TableCell>
-                                                                                        <TableCell align="right" sx={{ fontWeight: 800, py: 0.75 }}>{parseFloat(item.subtotal || 0).toLocaleString()} {currency}</TableCell>
-                                                                                    </TableRow>
-                                                                                );
-                                                                            })}
-                                                                        </TableBody>
-                                                                    </Table>
-                                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 4 }}>
-                                                                        <Typography variant="body2" sx={{ fontWeight: 800 }}>Total: <strong style={{ color: '#1a237e' }}>{parseFloat(sale.total || 0).toLocaleString()} {currency}</strong></Typography>
+                            {isMobile ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {filteredSales.map(sale => (
+                                        <Card key={sale.id} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                            <Box sx={{ p: 2, cursor: 'pointer' }} onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                                    <Box>
+                                                        <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>
+                                                            {sale.created_at ? new Date(sale.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                                                        </Typography>
+                                                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                                            {sale.customer_name || 'Walk-in Customer'}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Chip
+                                                        label={sale.payment_method}
+                                                        size="small"
+                                                        color={paymentColor(sale.payment_method)}
+                                                        sx={{ fontWeight: 900, borderRadius: 1.5 }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                                                        {sale.vehicle_number || 'No Vehicle'}
+                                                    </Typography>
+                                                    <Typography sx={{ fontWeight: 900, fontSize: '1.1rem' }}>
+                                                        {parseFloat(sale.total || 0).toLocaleString()} {currency}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                                                    {expandedSale === sale.id ? <ExpandLessIcon sx={{ opacity: 0.3 }} /> : <ExpandMoreIcon sx={{ opacity: 0.3 }} />}
+                                                </Box>
+                                            </Box>
+                                            <Collapse in={expandedSale === sale.id} timeout="auto" unmountOnExit>
+                                                <Divider sx={{ opacity: 0.5 }} />
+                                                <Box sx={{ p: 2, bgcolor: 'rgba(26,35,126,0.02)' }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                                                        Items ({sale.sale_items?.length || 0})
+                                                    </Typography>
+                                                    {(sale.sale_items || []).map((item, idx) => {
+                                                        const tire = item.tire_id ? tires.find(t => t.id === item.tire_id) : null;
+                                                        return (
+                                                            <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
+                                                                <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>
+                                                                    {item.quantity}x {tire ? `${tire.brand} ${tire.size}` : (item.service_name || 'Service')}
+                                                                </Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                                                    {parseFloat(item.subtotal || 0).toLocaleString()}
+                                                                </Typography>
+                                                            </Box>
+                                                        );
+                                                    })}
+                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.5, pt: 1, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                                                            Total: {parseFloat(sale.total || 0).toLocaleString()} {currency}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </Collapse>
+                                        </Card>
+                                    ))}
+                                    {filteredSales.length === 0 && (
+                                        <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                                            <Typography sx={{ fontWeight: 700 }}>No transactions found.</Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            ) : (
+                                <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                    <TableContainer sx={{ overflowX: 'auto' }}>
+                                        <Table>
+                                            <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 900, py: 2.5, width: 40 }} />
+                                                    <TableCell sx={{ fontWeight: 900 }}>DATE & TIME</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900 }}>CUSTOMER</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900 }}>VEHICLE</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900 }}>PAYMENT</TableCell>
+                                                    <TableCell sx={{ fontWeight: 900, textAlign: 'right' }}>TOTAL</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {filteredSales.length === 0 && (
+                                                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>No transactions found.</TableCell></TableRow>
+                                                )}
+                                                {filteredSales.map(sale => (
+                                                    <React.Fragment key={sale.id}>
+                                                        <TableRow
+                                                            hover
+                                                            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(26,35,126,0.02)' } }}
+                                                            onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
+                                                        >
+                                                            <TableCell>
+                                                                <IconButton size="small">
+                                                                    {expandedSale === sale.id ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
+                                                                </IconButton>
+                                                            </TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                                                                {sale.created_at ? new Date(sale.created_at).toLocaleString() : '—'}
+                                                            </TableCell>
+                                                            <TableCell sx={{ fontWeight: 800 }}>{sale.customer_name || '—'}</TableCell>
+                                                            <TableCell sx={{ color: 'text.secondary' }}>{sale.vehicle_number || '—'}</TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={sale.payment_method}
+                                                                    size="small"
+                                                                    color={paymentColor(sale.payment_method)}
+                                                                    sx={{ fontWeight: 800, borderRadius: 2 }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontWeight: 900, fontSize: '1rem', color: 'primary.main' }}>
+                                                                {parseFloat(sale.total || 0).toLocaleString()} {currency}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                        {/* Expandable Item Details */}
+                                                        <TableRow>
+                                                            <TableCell colSpan={6} sx={{ py: 0, borderBottom: expandedSale === sale.id ? undefined : 'none' }}>
+                                                                <Collapse in={expandedSale === sale.id} timeout="auto" unmountOnExit>
+                                                                    <Box sx={{ p: 3, bgcolor: 'rgba(26,35,126,0.02)', borderRadius: 3, m: 1 }}>
+                                                                        <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                                                            Invoice Items — Ref: {sale.id?.slice(0, 8).toUpperCase()}
+                                                                        </Typography>
+                                                                        <Table size="small" sx={{ mt: 1.5 }}>
+                                                                            <TableHead>
+                                                                                <TableRow>
+                                                                                    <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>ITEM</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>QTY</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem' }}>UNIT PRICE</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 900, py: 1, fontSize: '0.75rem', textAlign: 'right' }}>SUBTOTAL</TableCell>
+                                                                                </TableRow>
+                                                                            </TableHead>
+                                                                            <TableBody>
+                                                                                {(sale.sale_items || []).map(item => {
+                                                                                    const tire = item.tire_id ? tires.find(t => t.id === item.tire_id) : null;
+                                                                                    return (
+                                                                                        <TableRow key={item.id}>
+                                                                                            <TableCell sx={{ fontWeight: 700, py: 0.75 }}>{tire ? `${tire.brand} ${tire.size}` : (item.service_name || 'Service')}</TableCell>
+                                                                                            <TableCell sx={{ py: 0.75 }}>{item.quantity}</TableCell>
+                                                                                            <TableCell sx={{ py: 0.75 }}>{parseFloat(item.price || 0).toLocaleString()} {currency}</TableCell>
+                                                                                            <TableCell align="right" sx={{ fontWeight: 800, py: 0.75 }}>{parseFloat(item.subtotal || 0).toLocaleString()} {currency}</TableCell>
+                                                                                        </TableRow>
+                                                                                    );
+                                                                                })}
+                                                                            </TableBody>
+                                                                        </Table>
+                                                                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 4 }}>
+                                                                            <Typography variant="body2" sx={{ fontWeight: 800 }}>Total: <strong style={{ color: '#1a237e' }}>{parseFloat(sale.total || 0).toLocaleString()} {currency}</strong></Typography>
+                                                                        </Box>
                                                                     </Box>
-                                                                </Box>
-                                                            </Collapse>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                </React.Fragment>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Card>
+                                                                </Collapse>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </React.Fragment>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Card>
+                            )}
                         </Box>
                     )}
                 </Box>
@@ -547,6 +700,7 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                     businessProfile={businessProfile}
                     accountsList={accounts}
                     invoicesList={invoices}
+                    recordAudit={recordAudit}
                 />
             )}
 
@@ -569,43 +723,77 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                             </Card>
                         </Grid>
                     </Grid>
-                    <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <TableContainer sx={{ overflowX: 'auto' }}>
-                            <Table>
-                                <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 900, py: 2.5 }}>VENDOR NAME</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>CONTACT</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>PAYABLE BALANCE</TableCell>
-                                        <TableCell align="center" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {suppliers.length === 0 && (
-                                        <TableRow><TableCell colSpan={4} align="center" sx={{ py: 6 }}>No vendors registered.</TableCell></TableRow>
-                                    )}
-                                    {suppliers.map(sup => (
-                                        <TableRow key={sup.id} hover>
-                                            <TableCell sx={{ fontWeight: 900 }}>{sup.name}</TableCell>
-                                            <TableCell>{sup.phone || sup.email || '—'}</TableCell>
-                                            <TableCell sx={{ fontWeight: 900, color: 'error.main' }}>{Number(sup.payable_balance || 0).toLocaleString()} {currency}</TableCell>
-                                            <TableCell align="center">
-                                                <Button 
-                                                    size="small" 
-                                                    variant="contained" 
-                                                    color="primary"
-                                                    onClick={() => { setSelectedSupplierForStatement(sup); setOpenVendorStatement(true); }}
-                                                    sx={{ borderRadius: 2, px: 3, fontWeight: 800 }}
-                                                >
-                                                    VIEW FULL DETAILS & LEDGER
-                                                </Button>
-                                            </TableCell>
+                    {isMobile ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {suppliers.map(sup => (
+                                <Card key={sup.id} sx={{ borderRadius: 3, p: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                            {sup.name}
+                                        </Typography>
+                                        <Typography sx={{ fontWeight: 900, color: 'error.main' }}>
+                                            {Number(sup.payable_balance || 0).toLocaleString()} {currency}
+                                        </Typography>
+                                    </Box>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                                        {sup.phone || sup.email || 'No contact info'}
+                                    </Typography>
+                                    <Button 
+                                        fullWidth
+                                        variant="outlined" 
+                                        color="primary"
+                                        onClick={() => { setSelectedSupplierForStatement(sup); setOpenVendorStatement(true); }}
+                                        sx={{ borderRadius: 2, fontWeight: 800 }}
+                                    >
+                                        View Full Ledger
+                                    </Button>
+                                </Card>
+                            ))}
+                            {suppliers.length === 0 && (
+                                <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                                    <Typography sx={{ fontWeight: 700 }}>No vendors registered.</Typography>
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                            <TableContainer sx={{ overflowX: 'auto' }}>
+                                <Table>
+                                    <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 900, py: 2.5 }}>VENDOR NAME</TableCell>
+                                            <TableCell sx={{ fontWeight: 900 }}>CONTACT</TableCell>
+                                            <TableCell sx={{ fontWeight: 900 }}>PAYABLE BALANCE</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 900 }}>ACTIONS</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Card>
+                                    </TableHead>
+                                    <TableBody>
+                                        {suppliers.length === 0 && (
+                                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 6 }}>No vendors registered.</TableCell></TableRow>
+                                        )}
+                                        {suppliers.map(sup => (
+                                            <TableRow key={sup.id} hover>
+                                                <TableCell sx={{ fontWeight: 900 }}>{sup.name}</TableCell>
+                                                <TableCell>{sup.phone || sup.email || '—'}</TableCell>
+                                                <TableCell sx={{ fontWeight: 900, color: 'error.main' }}>{Number(sup.payable_balance || 0).toLocaleString()} {currency}</TableCell>
+                                                <TableCell align="center">
+                                                    <Button 
+                                                        size="small" 
+                                                        variant="contained" 
+                                                        color="primary"
+                                                        onClick={() => { setSelectedSupplierForStatement(sup); setOpenVendorStatement(true); }}
+                                                        sx={{ borderRadius: 2, px: 3, fontWeight: 800 }}
+                                                    >
+                                                        VIEW FULL DETAILS & LEDGER
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Card>
+                    )}
 
                     <Dialog open={openVendorStatement} onClose={() => setOpenVendorStatement(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
                         <DialogTitle sx={{ fontWeight: 900 }}>
@@ -665,63 +853,48 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
             {/* TAB 4: Audit Log */}
             {hubTab === 4 && (
                 <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', mb: 3, gap: 2 }}>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>System Audit Trail</Typography>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Box sx={{ display: 'flex', gap: 2, width: isMobile ? '100%' : 'auto' }}>
                             <TextField 
                                 size="small" 
-                                placeholder="Search actions or notes..." 
+                                placeholder="Search actions..." 
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 InputProps={{
                                     startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18 }} /></InputAdornment>,
-                                    sx: { borderRadius: 3, width: 300 }
+                                    sx: { borderRadius: 3, width: isMobile ? '100%' : 300 }
                                 }}
                             />
-                            <Button startIcon={<RefreshIcon />} onClick={fetchAuditLogs} variant="outlined" sx={{ borderRadius: 3 }}>
-                                {loadingAudit ? 'Loading...' : 'Refresh'}
-                            </Button>
+                            {!isMobile && (
+                                <Button startIcon={<RefreshIcon />} onClick={fetchAuditLogs} variant="outlined" sx={{ borderRadius: 3 }}>
+                                    {loadingAudit ? 'Loading...' : 'Refresh'}
+                                </Button>
+                            )}
                         </Box>
+                        {isMobile && (
+                            <Button fullWidth startIcon={<RefreshIcon />} onClick={fetchAuditLogs} variant="outlined" sx={{ borderRadius: 3 }}>
+                                {loadingAudit ? 'Refreshing...' : 'Refresh Logs'}
+                            </Button>
+                        )}
                     </Box>
-                    <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <TableContainer sx={{ overflowX: 'auto' }}>
-                            <Table>
-                                <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 900, py: 2.5, width: 180 }}>DATE & TIME</TableCell>
-                                        <TableCell sx={{ fontWeight: 900, width: 160 }}>ACTION</TableCell>
-                                        <TableCell sx={{ fontWeight: 900, width: 160 }}>PERFORMED BY</TableCell>
-                                        <TableCell sx={{ fontWeight: 900, width: 120 }}>ENTITY</TableCell>
-                                        <TableCell sx={{ fontWeight: 900 }}>TRANSACTION DETAILS</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {auditLogs.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
-                                                {loadingAudit ? 'Loading audit logs...' : 'No audit events found.'}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                    {auditLogs
-                                        .filter(log => {
-                                            const search = searchTerm.toLowerCase();
-                                            return !searchTerm || 
-                                                log.action?.toLowerCase().includes(search) || 
-                                                log.notes?.toLowerCase().includes(search) ||
-                                                log.table_name?.toLowerCase().includes(search);
-                                        })
-                                        .map(log => (
-                                        <TableRow key={log.id} hover>
-                                            <TableCell sx={{ verticalAlign: 'top', py: 2.5 }}>
-                                                <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>
-                                                    {log.created_at ? new Date(log.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                    {isMobile ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {auditLogs
+                                .filter(log => {
+                                    const search = searchTerm.toLowerCase();
+                                    return !searchTerm || 
+                                        log.action?.toLowerCase().includes(search) || 
+                                        log.notes?.toLowerCase().includes(search) ||
+                                        log.table_name?.toLowerCase().includes(search);
+                                })
+                                .map(log => (
+                                    <Card key={log.id} sx={{ borderRadius: 3, p: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                                            <Box>
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>
+                                                    {log.created_at ? new Date(log.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                                                    {log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ verticalAlign: 'top' }}>
                                                 <Chip
                                                     label={log.action.replace(/_/g, ' ')}
                                                     size="small"
@@ -730,59 +903,156 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                                         log.action.includes('payment') ? 'success' :
                                                         log.action.includes('return') ? 'warning' : 'default'
                                                     }
-                                                    sx={{ fontWeight: 900, borderRadius: 2, textTransform: 'uppercase', fontSize: '0.65rem' }}
+                                                    sx={{ fontWeight: 900, borderRadius: 1.5, textTransform: 'uppercase', fontSize: '0.6rem', mt: 0.5 }}
                                                 />
-                                                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontFamily: 'monospace', color: 'text.disabled' }}>
-                                                    ID: {log.record_id?.slice(0, 8)}
+                                            </Box>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main', display: 'block' }}>
+                                                    {log.profiles?.name || 'System'}
                                                 </Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ verticalAlign: 'top' }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.main' }}>
-                                                        {log.profiles?.name?.[0] || '?'}
-                                                    </Avatar>
-                                                    <Box>
-                                                        <Typography sx={{ fontWeight: 800, fontSize: '0.8rem' }}>{log.profiles?.name || 'System'}</Typography>
-                                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{log.profiles?.email || 'automated'}</Typography>
-                                                    </Box>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell sx={{ verticalAlign: 'top' }}>
-                                                <Typography sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase' }}>
                                                     {log.table_name || 'System'}
                                                 </Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 2 }}>
-                                                <Box sx={{ 
-                                                    p: 1.5, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, 
-                                                    borderLeft: '3px solid', borderColor: 'primary.main',
-                                                    display: 'flex', flexWrap: 'wrap', gap: 2
-                                                }}>
-                                                    {(() => {
-                                                        try {
-                                                            const details = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
-                                                            return Object.entries(details).map(([k, v]) => (
-                                                                <Box key={k}>
-                                                                    <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
+                                            </Box>
+                                        </Box>
+                                        <Box sx={{ 
+                                            p: 1.5, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, 
+                                            borderLeft: '3px solid', borderColor: 'primary.main',
+                                            mt: 1
+                                        }}>
+                                            {(() => {
+                                                try {
+                                                    const details = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
+                                                    return (
+                                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                                                            {Object.entries(details).map(([k, v]) => (
+                                                                <Box key={k} sx={{ minWidth: '40%' }}>
+                                                                    <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.55rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
                                                                         {k.replace(/_/g, ' ')}
                                                                     </Typography>
-                                                                    <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+                                                                    <Typography sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#1e293b' }}>
                                                                         {typeof v === 'object' ? JSON.stringify(v) : v?.toString()}
                                                                     </Typography>
                                                                 </Box>
-                                                            ));
-                                                        } catch (e) {
-                                                            return <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.notes || '—'}</Typography>;
-                                                        }
-                                                    })()}
-                                                </Box>
-                                            </TableCell>
+                                                            ))}
+                                                        </Box>
+                                                    );
+                                                } catch (e) {
+                                                    return <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{log.notes || 'No details'}</Typography>;
+                                                }
+                                            })()}
+                                        </Box>
+                                    </Card>
+                                ))}
+                            {auditLogs.length === 0 && (
+                                <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                                    <Typography sx={{ fontWeight: 700 }}>{loadingAudit ? 'Loading logs...' : 'No audit events found.'}</Typography>
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                            <TableContainer sx={{ overflowX: 'auto' }}>
+                                <Table>
+                                    <TableHead sx={{ bgcolor: 'rgba(26,35,126,0.03)' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 900, py: 2.5, width: 180 }}>DATE & TIME</TableCell>
+                                            <TableCell sx={{ fontWeight: 900, width: 160 }}>ACTION</TableCell>
+                                            <TableCell sx={{ fontWeight: 900, width: 160 }}>PERFORMED BY</TableCell>
+                                            <TableCell sx={{ fontWeight: 900, width: 120 }}>ENTITY</TableCell>
+                                            <TableCell sx={{ fontWeight: 900 }}>TRANSACTION DETAILS</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Card>
+                                    </TableHead>
+                                    <TableBody>
+                                        {auditLogs.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
+                                                    {loadingAudit ? 'Loading audit logs...' : 'No audit events found.'}
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {auditLogs
+                                            .filter(log => {
+                                                const search = searchTerm.toLowerCase();
+                                                return !searchTerm || 
+                                                    log.action?.toLowerCase().includes(search) || 
+                                                    log.notes?.toLowerCase().includes(search) ||
+                                                    log.table_name?.toLowerCase().includes(search);
+                                            })
+                                            .map(log => (
+                                            <TableRow key={log.id} hover>
+                                                <TableCell sx={{ verticalAlign: 'top', py: 2.5 }}>
+                                                    <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>
+                                                        {log.created_at ? new Date(log.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                                                        {log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ verticalAlign: 'top' }}>
+                                                    <Chip
+                                                        label={log.action.replace(/_/g, ' ')}
+                                                        size="small"
+                                                        color={
+                                                            log.action.includes('Sale') ? 'primary' : 
+                                                            log.action.includes('Payment') ? 'success' :
+                                                            log.action.includes('Credit') ? 'warning' :
+                                                            log.action.includes('Return') ? 'warning' : 'default'
+                                                        }
+                                                        sx={{ fontWeight: 900, borderRadius: 2, textTransform: 'uppercase', fontSize: '0.65rem' }}
+                                                    />
+                                                    <Typography variant="caption" sx={{ display: 'block', mt: 1, fontFamily: 'monospace', color: 'text.disabled' }}>
+                                                        ID: {log.record_id?.slice(0, 8)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ verticalAlign: 'top' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.main' }}>
+                                                            {log.profiles?.name?.[0] || '?'}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 800, fontSize: '0.8rem' }}>{log.profiles?.name || 'System'}</Typography>
+                                                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{log.profiles?.email || 'automated'}</Typography>
+                                                        </Box>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell sx={{ verticalAlign: 'top' }}>
+                                                    <Typography sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                        {log.table_name || 'System'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 2 }}>
+                                                    <Box sx={{ 
+                                                        p: 1.5, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, 
+                                                        borderLeft: '3px solid', borderColor: 'primary.main',
+                                                        display: 'flex', flexWrap: 'wrap', gap: 2
+                                                    }}>
+                                                        {(() => {
+                                                            try {
+                                                                const details = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
+                                                                return Object.entries(details).map(([k, v]) => (
+                                                                    <Box key={k}>
+                                                                        <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
+                                                                            {k.replace(/_/g, ' ')}
+                                                                        </Typography>
+                                                                        <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+                                                                            {typeof v === 'object' ? JSON.stringify(v) : v?.toString()}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                ));
+                                                            } catch (e) {
+                                                                return <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.notes || '—'}</Typography>;
+                                                            }
+                                                        })()}
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Card>
+                    )}
                 </Box>
             )}
             <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>

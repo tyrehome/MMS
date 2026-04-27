@@ -3,13 +3,13 @@ import {
   Box, Typography, Grid, Card, CardContent, Avatar, Chip, 
   Divider, List, ListItem, ListItemText, ListItemIcon, 
   Button, TextField, InputAdornment, Tab, Tabs, 
-  Paper
+  Paper, useMediaQuery, useTheme, IconButton
 } from '@mui/material';
 import {
   Person, DirectionsCar, Hotel, 
   LocalPhone, Email, 
   Receipt, Warning, CalendarMonth, SettingsAccessibility,
-  Add as AddIcon, PhoneInTalk as PhoneIcon
+  Add as AddIcon, PhoneInTalk as PhoneIcon, ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -29,6 +29,8 @@ const CustomerProfile = ({
   sales = [],
   businessProfile
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tabLevel1, setTabLevel1] = useState(0);
@@ -89,87 +91,93 @@ const CustomerProfile = ({
       <Tabs 
         value={tabLevel1} 
         onChange={(e, v) => setTabLevel1(v)} 
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
         sx={{ 
-          mb: 4,
+          mb: isMobile ? 2 : 4,
           '& .MuiTabs-indicator': { height: 3, borderRadius: 1.5 },
-          '& .MuiTab-root': { fontWeight: 800, fontSize: '0.95rem', textTransform: 'none' }
+          '& .MuiTab-root': { fontWeight: 800, fontSize: isMobile ? '0.85rem' : '0.95rem', textTransform: 'none' }
         }}
       >
-        <Tab icon={<SettingsAccessibility />} iconPosition="start" label="Customer Intelligence" />
-        <Tab icon={<CalendarMonth />} iconPosition="start" label="Appointments & Tasks" />
-        <Tab icon={<DirectionsCar />} iconPosition="start" label="Fleet Tracking" />
-        <Tab icon={<PhoneIcon />} iconPosition="start" label={`Retention & Call List (${retentionList.length})`} />
+        <Tab icon={<SettingsAccessibility />} iconPosition="start" label={isMobile ? "Clients" : "Customer Intelligence"} />
+        <Tab icon={<CalendarMonth />} iconPosition="start" label={isMobile ? "Bookings" : "Appointments & Tasks"} />
+        <Tab icon={<DirectionsCar />} iconPosition="start" label={isMobile ? "Fleet" : "Fleet Tracking"} />
+        <Tab icon={<PhoneIcon />} iconPosition="start" label={isMobile ? "Retention" : `Retention & Call List (${retentionList.length})`} />
       </Tabs>
 
       {tabLevel1 === 0 && (
+        <React.Fragment>
         <Grid container spacing={3}>
           {/* Left Panel: Search & List */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ height: 'calc(100vh - 280px)', display: 'flex', flexDirection: 'column', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-              <Box sx={{ p: 2 }}>
-                <TextField
-                  fullWidth
-                  placeholder="Filter clients..."
-                  variant="outlined"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Person color="action" />
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: 3 }
-                  }}
-                />
-                <Button 
-                    fullWidth 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
-                    onClick={() => setIsRegisterOpen(true)}
-                    sx={{ mt: 2, borderRadius: 3, fontWeight: 900 }}
-                >
-                    REGISTER CLIENT
-                </Button>
-              </Box>
-              <Divider />
-              <List sx={{ overflowY: 'auto', flexGrow: 1, p: 0 }}>
-                {filteredCustomers.map((customer) => (
-                  <React.Fragment key={customer.id}>
-                    <ListItem 
-                      button 
-                      selected={selectedCustomerId === customer.id}
-                      onClick={() => setSelectedCustomerId(customer.id)}
-                      sx={{
-                        py: 2,
-                        px: 3,
-                        borderLeft: '4px solid transparent',
-                        '&.Mui-selected': {
-                          borderLeftColor: 'primary.main',
-                          bgcolor: 'rgba(26, 35, 126, 0.04)',
-                          '&:hover': { bgcolor: 'rgba(26, 35, 126, 0.08)' }
-                        }
-                      }}
-                    >
-                      <ListItemIcon>
-                        <Avatar sx={{ bgcolor: 'secondary.light', color: 'secondary.main', fontWeight: 800 }}>
-                          {customer.name?.charAt(0)}
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={<Typography sx={{ fontWeight: 700 }}>{customer.name}</Typography>}
-                        secondary={customer.phone}
-                      />
-                    </ListItem>
-                    <Divider component="li" />
-                  </React.Fragment>
-                ))}
-              </List>
-            </Card>
-          </Grid>
+          {(!isMobile || !selectedCustomerId) && (
+            <Grid item xs={12} md={4}>
+              <Card sx={{ height: isMobile ? 'calc(100vh - 240px)' : 'calc(100vh - 280px)', display: 'flex', flexDirection: 'column', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                <Box sx={{ p: 2 }}>
+                  <TextField
+                    fullWidth
+                    placeholder="Filter clients..."
+                    variant="outlined"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Person color="action" />
+                        </InputAdornment>
+                      ),
+                      sx: { borderRadius: 3 }
+                    }}
+                  />
+                  <Button 
+                      fullWidth 
+                      variant="contained" 
+                      startIcon={<AddIcon />} 
+                      onClick={() => setIsRegisterOpen(true)}
+                      sx={{ mt: 2, borderRadius: 3, fontWeight: 900 }}
+                  >
+                      REGISTER CLIENT
+                  </Button>
+                </Box>
+                <Divider />
+                <List sx={{ overflowY: 'auto', flexGrow: 1, p: 0 }}>
+                  {filteredCustomers.map((customer) => (
+                    <React.Fragment key={customer.id}>
+                      <ListItem 
+                        button 
+                        selected={selectedCustomerId === customer.id}
+                        onClick={() => setSelectedCustomerId(customer.id)}
+                        sx={{
+                          py: 2,
+                          px: 3,
+                          borderLeft: '4px solid transparent',
+                          '&.Mui-selected': {
+                            borderLeftColor: 'primary.main',
+                            bgcolor: 'rgba(26, 35, 126, 0.04)',
+                            '&:hover': { bgcolor: 'rgba(26, 35, 126, 0.08)' }
+                          }
+                        }}
+                      >
+                        <ListItemIcon>
+                          <Avatar sx={{ bgcolor: 'secondary.light', color: 'secondary.main', fontWeight: 800 }}>
+                            {customer.name?.charAt(0)}
+                          </Avatar>
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary={<Typography sx={{ fontWeight: 700 }}>{customer.name}</Typography>}
+                          secondary={customer.phone}
+                        />
+                      </ListItem>
+                      <Divider component="li" />
+                    </React.Fragment>
+                  ))}
+                </List>
+              </Card>
+            </Grid>
+          )}
 
           {/* Right Panel: Details */}
-          <Grid item xs={12} md={8}>
+          {(!isMobile || selectedCustomerId) && (
+            <Grid item xs={12} md={8}>
             {!selectedCustomer ? (
               <Card sx={{ height: 'calc(100vh - 280px)', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.01)', borderRadius: 4, border: '2px dashed rgba(0,0,0,0.05)' }}>
                 <Box sx={{ textAlign: 'center' }}>
@@ -178,76 +186,87 @@ const CustomerProfile = ({
                 </Box>
               </Card>
             ) : (
-              <Card sx={{ height: 'calc(100vh - 280px)', overflowY: 'auto', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-                <Box sx={{ p: 4, bgcolor: 'primary.main', color: '#fff', position: 'relative', overflow: 'hidden' }}>
-                  <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: 3 }}>
-                    <Avatar sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.2)', fontSize: 32, fontWeight: 900, border: '4px solid rgba(255,255,255,0.3)' }}>
-                      {selectedCustomer.name?.charAt(0)}
-                    </Avatar>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, mb: 1 }}>{selectedCustomer.name}</Typography>
-                      <Grid container spacing={2}>
-                        <Grid item sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <LocalPhone sx={{ fontSize: 16, opacity: 0.8 }} />
-                          <Typography variant="body2">{selectedCustomer.phone}</Typography>
-                        </Grid>
-                        <Grid item sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Email sx={{ fontSize: 16, opacity: 0.8 }} />
-                          <Typography variant="body2">{selectedCustomer.email || 'No email'}</Typography>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                    <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
-                      <Chip 
-                        label={totalSpent > 100000 ? 'PREMIUM CLIENT' : 'ACTIVE CLIENT'}
-                        sx={{ bgcolor: totalSpent > 100000 ? 'secondary.main' : 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 900, px: 1 }}
-                      />
-                      <Chip 
-                        label={`LTV: ${totalSpent.toLocaleString()} LKR`}
-                        sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 800, px: 1 }}
-                      />
+                <Card sx={{ height: isMobile ? 'calc(100vh - 160px)' : 'calc(100vh - 280px)', overflowY: 'auto', borderRadius: isMobile ? 0 : 4, boxShadow: isMobile ? 'none' : '0 4px 20px rgba(0,0,0,0.05)', border: isMobile ? 'none' : '1px solid rgba(0,0,0,0.05)' }}>
+                  <Box sx={{ p: isMobile ? 2 : 4, bgcolor: 'primary.main', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+                    {isMobile && (
+                      <IconButton 
+                        onClick={() => setSelectedCustomerId(null)} 
+                        sx={{ color: '#fff', mb: 2, p: 0.5, bgcolor: 'rgba(255,255,255,0.1)' }}
+                      >
+                        <ArrowBackIcon sx={{ fontSize: 20 }} />
+                      </IconButton>
+                    )}
+                    <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'center' : 'flex-start', gap: isMobile ? 1.5 : 3, textAlign: isMobile ? 'center' : 'left' }}>
+                      <Avatar sx={{ width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, bgcolor: 'rgba(255,255,255,0.2)', fontSize: isMobile ? 28 : 32, fontWeight: 900, border: '4px solid rgba(255,255,255,0.3)' }}>
+                        {selectedCustomer.name?.charAt(0)}
+                      </Avatar>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 900, mb: isMobile ? 0.5 : 1 }}>{selectedCustomer.name}</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start', gap: isMobile ? 1 : 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <LocalPhone sx={{ fontSize: 14, opacity: 0.8 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 700 }}>{selectedCustomer.phone}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Email sx={{ fontSize: 14, opacity: 0.8 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 700 }}>{selectedCustomer.email || 'No email'}</Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                      <Box sx={{ textAlign: isMobile ? 'center' : 'right', display: 'flex', flexDirection: 'row', gap: 1, alignItems: 'center', mt: isMobile ? 1 : 0 }}>
+                        <Chip 
+                          label={totalSpent > 100000 ? 'PREMIUM' : 'ACTIVE'}
+                          size="small"
+                          sx={{ bgcolor: totalSpent > 100000 ? 'secondary.main' : 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 900, height: 20, fontSize: '0.65rem' }}
+                        />
+                        <Chip 
+                          label={`LTV: ${totalSpent.toLocaleString()}`}
+                          size="small"
+                          sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 800, height: 20, fontSize: '0.65rem' }}
+                        />
+                      </Box>
                     </Box>
                   </Box>
-                </Box>
 
-                <Box sx={{ px: 4, py: 2, bgcolor: 'rgba(26, 35, 126, 0.04)', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: 4 }}>
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>REVENUE LTV</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: 'primary.main' }}>{totalSpent.toLocaleString()} {businessProfile?.currency || 'LKR'}</Typography>
+                <Box sx={{ px: isMobile ? 2 : 4, py: isMobile ? 1.5 : 2, bgcolor: 'rgba(26, 35, 126, 0.04)', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1.5 : 4 }}>
+                  <Box sx={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', justifyContent: isMobile ? 'space-between' : 'flex-start', alignItems: isMobile ? 'center' : 'flex-start' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', display: 'block', letterSpacing: 0.5 }}>REVENUE LTV</Typography>
+                    <Typography variant={isMobile ? "subtitle2" : "h6"} sx={{ fontWeight: 900, color: 'primary.main' }}>{totalSpent.toLocaleString()} <Typography component="span" variant="caption" sx={{ fontSize: '0.65rem' }}>{businessProfile?.currency || 'LKR'}</Typography></Typography>
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>OUTSTANDING</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: Number(customerAccount?.receivable) > 0 ? 'error.main' : 'success.main' }}>
-                      {Number(customerAccount?.receivable || 0).toLocaleString()} {businessProfile?.currency || 'LKR'}
+                  {!isMobile && <Divider orientation="vertical" flexItem />}
+                  <Box sx={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', justifyContent: isMobile ? 'space-between' : 'flex-start', alignItems: isMobile ? 'center' : 'flex-start' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', display: 'block', letterSpacing: 0.5 }}>OUTSTANDING</Typography>
+                    <Typography variant={isMobile ? "subtitle2" : "h6"} sx={{ fontWeight: 900, color: Number(customerAccount?.receivable) > 0 ? 'error.main' : 'success.main' }}>
+                      {Number(customerAccount?.receivable || 0).toLocaleString()} <Typography component="span" variant="caption" sx={{ fontSize: '0.65rem' }}>{businessProfile?.currency || 'LKR'}</Typography>
                     </Typography>
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', display: 'block' }}>STORAGE ITEMS</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: 'secondary.main' }}>{customerHotel.length} Sets</Typography>
+                  {!isMobile && <Divider orientation="vertical" flexItem />}
+                  <Box sx={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', justifyContent: isMobile ? 'space-between' : 'flex-start', alignItems: isMobile ? 'center' : 'flex-start' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', display: 'block', letterSpacing: 0.5 }}>STORAGE ITEMS</Typography>
+                    <Typography variant={isMobile ? "subtitle2" : "h6"} sx={{ fontWeight: 900, color: 'secondary.main' }}>{customerHotel.length} Sets</Typography>
                   </Box>
                 </Box>
 
                 <Tabs 
                   value={tabLevel2} 
                   onChange={(e, v) => setTabLevel2(v)} 
-                  sx={{ borderBottom: 1, borderColor: 'divider', px: 2, '& .MuiTab-root': { fontWeight: 700 } }}
+                  variant={isMobile ? "scrollable" : "standard"}
+                  sx={{ borderBottom: 1, borderColor: 'divider', px: 2, '& .MuiTab-root': { fontWeight: 700, minWidth: isMobile ? 'auto' : 90 } }}
                 >
                   <Tab label="Financials" />
                   <Tab label="Vehicles" />
-                  <Tab label="Tire Hotel" />
+                  <Tab label="Storage" />
                   <Tab label="History" />
                 </Tabs>
 
-                <CardContent sx={{ p: 4 }}>
+                <CardContent sx={{ p: isMobile ? 2 : 4 }}>
                   {tabLevel2 === 0 && (
-                    <Grid container spacing={3}>
+                    <Grid container spacing={isMobile ? 2 : 3}>
                       <Grid item xs={12} sm={6}>
                         <Card variant="outlined" sx={{ borderRadius: 4, bgcolor: 'rgba(26, 35, 126, 0.02)' }}>
-                          <CardContent>
+                          <CardContent sx={{ p: isMobile ? 2 : 3 }}>
                             <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800 }}>Account Receivable</Typography>
-                            <Typography variant="h4" color="primary" sx={{ fontWeight: 900 }}>
+                            <Typography variant={isMobile ? "h5" : "h4"} color="primary" sx={{ fontWeight: 900 }}>
                               {Number(customerAccount?.receivable || 0).toLocaleString()} LKR
                             </Typography>
                             {Number(customerAccount?.receivable || 0) > 0 && (
@@ -261,9 +280,9 @@ const CustomerProfile = ({
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Card variant="outlined" sx={{ borderRadius: 4, bgcolor: 'rgba(245, 0, 87, 0.02)' }}>
-                          <CardContent>
+                          <CardContent sx={{ p: isMobile ? 2 : 3 }}>
                             <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800 }}>Lifetime Value</Typography>
-                            <Typography variant="h4" color="secondary" sx={{ fontWeight: 900 }}>
+                            <Typography variant={isMobile ? "h5" : "h4"} color="secondary" sx={{ fontWeight: 900 }}>
                               {totalSpent.toLocaleString()} LKR
                             </Typography>
                           </CardContent>
@@ -294,11 +313,14 @@ const CustomerProfile = ({
                   {tabLevel2 === 2 && (
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Active Storage</Typography>
+                      {customerHotel.length === 0 && (
+                        <Typography sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>No active tire storage for this customer.</Typography>
+                      )}
                       {customerHotel.map(h => (
                         <Paper key={h.id} variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
                           <Grid container alignItems="center">
                             <Grid item xs={2} sx={{ textAlign: 'center' }}><Hotel color="primary" /></Grid>
-                            <Grid item xs={6}>
+                            <Grid item xs={10}>
                               <Typography sx={{ fontWeight: 800 }}>{h.quantity}x {h.brand} Tires</Typography>
                               <Typography variant="caption" color="text.secondary">Storage: {h.storage_date}</Typography>
                             </Grid>
@@ -311,24 +333,26 @@ const CustomerProfile = ({
                   {tabLevel2 === 3 && (
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Recent Invoices</Typography>
-                      <List>
+                      <List sx={{ p: 0 }}>
                         {customerSales.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(s => (
-                          <ListItem key={s.id} sx={{ px: 0 }}>
-                            <ListItemIcon><Receipt color="action" /></ListItemIcon>
+                          <ListItem key={s.id} sx={{ px: 0, py: 1.5, borderBottom: '1px solid rgba(0,0,0,0.03)' }}>
+                            <ListItemIcon sx={{ minWidth: 40 }}><Receipt color="action" /></ListItemIcon>
                             <ListItemText 
-                              primary={<Typography sx={{ fontWeight: 700 }}>{Number(s.total).toLocaleString()} LKR Invoice</Typography>}
-                              secondary={`${format(new Date(s.created_at || new Date()), 'PPP')} • Method: ${s.payment_method}`}
+                              primary={<Typography sx={{ fontWeight: 700 }}>{Number(s.total).toLocaleString()} LKR</Typography>}
+                              secondary={`${format(new Date(s.created_at || new Date()), isMobile ? 'MMM d, yyyy' : 'PPP')} • ${s.payment_method}`}
                             />
                           </ListItem>
                         ))}
                       </List>
                     </Box>
                   )}
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                )}
+              </Grid>
             )}
           </Grid>
-        </Grid>
+        </React.Fragment>
       )}
 
       {tabLevel1 === 1 && <AppointmentSystem appointmentsList={appointments} vehiclesList={vehicles} />}
@@ -344,19 +368,26 @@ const CustomerProfile = ({
           {retentionList.length === 0 ? (
             <Alert severity="success" sx={{ borderRadius: 3 }}>All clients are fully up-to-date with their service protocols!</Alert>
           ) : (
-            <List>
+            <List sx={{ p: 0 }}>
               {retentionList.map(c => (
-                <Paper key={c.id} variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Paper key={c.id} variant="outlined" sx={{ p: isMobile ? 1.5 : 2, mb: 1.5, borderRadius: 3, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Avatar sx={{ bgcolor: 'error.light', color: 'error.main' }}><Warning /></Avatar>
                     <Box>
-                      <Typography sx={{ fontWeight: 900 }}>{c.name}</Typography>
-                      <Typography variant="body2" color="text.secondary">Last seen: {format(c.lastVisit, 'PPP')} (Over 6 months ago)</Typography>
+                      <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '0.95rem' : '1rem' }}>{c.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">Last seen: {format(c.lastVisit, isMobile ? 'MMM d, yyyy' : 'PPP')}</Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography sx={{ fontWeight: 800, color: 'text.secondary' }}>{c.phone || 'No Phone'}</Typography>
-                    <Button variant="contained" color="primary" startIcon={<PhoneIcon />} onClick={() => setSelectedCustomerId(c.id) || setTabLevel1(0)} sx={{ borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: isMobile ? '100%' : 'auto', gap: 2 }}>
+                    <Typography sx={{ fontWeight: 800, color: 'text.secondary', fontSize: isMobile ? '0.85rem' : '1rem' }}>{c.phone || 'No Phone'}</Typography>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      size={isMobile ? "small" : "medium"}
+                      startIcon={<PhoneIcon />} 
+                      onClick={() => setSelectedCustomerId(c.id) || setTabLevel1(0)} 
+                      sx={{ borderRadius: 2, fontWeight: 800 }}
+                    >
                       VIEW LOG
                     </Button>
                   </Box>

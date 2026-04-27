@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   TextField, Button, Grid, Typography, Box, IconButton,
-  Card, Tabs, Tab, Chip, Avatar
+  Card, Tabs, Tab, Chip, Avatar, useMediaQuery, useTheme, Divider
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
@@ -36,6 +36,8 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
 
 
 function TireHotel({ hotelTiresProps = [], customersProps = [], addHotelTire, updateHotelTire, deleteHotelTire }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [hotelTires, setHotelTires] = useState(hotelTiresProps);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState(0);
@@ -137,9 +139,15 @@ function TireHotel({ hotelTiresProps = [], customersProps = [], addHotelTire, up
         <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>Global custody control for premium client assets</Typography>
       </Box>
 
-      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 4 }}>
-        <Tab label="Occupancy Overview" sx={{ fontWeight: 800 }} />
-        <Tab label="Asset Registry" sx={{ fontWeight: 800 }} />
+      <Tabs 
+        value={activeTab} 
+        onChange={(e, v) => setActiveTab(v)} 
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
+        sx={{ mb: 4 }}
+      >
+        <Tab icon={isMobile ? <InventoryIcon /> : null} iconPosition="start" label="Overview" sx={{ fontWeight: 800 }} />
+        <Tab icon={isMobile ? <AddIcon /> : null} iconPosition="start" label="Registry" sx={{ fontWeight: 800 }} />
       </Tabs>
 
       {activeTab === 0 && (
@@ -179,22 +187,92 @@ function TireHotel({ hotelTiresProps = [], customersProps = [], addHotelTire, up
 
       {activeTab === 1 && (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <TextField placeholder="Filter inventory..." size="small" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ sx: { borderRadius: 4, width: 300, bgcolor: '#fff' } }} />
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsAddDialogOpen(true)} sx={{ borderRadius: 3, fontWeight: 900 }}>SECURE NEW ASSET</Button>
-            </Box>
-            <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                <StyledDataGrid 
-                    rows={filteredTires} 
-                    columns={columns} 
-                    autoHeight 
-                    components={{ Toolbar: GridToolbar }} 
-                    getRowId={(r) => r.id}
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', mb: 3, gap: 2 }}>
+                <TextField 
+                  fullWidth={isMobile}
+                  placeholder="Filter inventory..." 
+                  size="small" 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                  InputProps={{ sx: { borderRadius: 4, width: isMobile ? '100%' : 300, bgcolor: '#fff' } }} 
                 />
-            </Card>
+                <Button fullWidth={isMobile} variant="contained" startIcon={<AddIcon />} onClick={() => setIsAddDialogOpen(true)} sx={{ borderRadius: 3, fontWeight: 900 }}>SECURE NEW ASSET</Button>
+            </Box>
+            
+            {isMobile ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {filteredTires.map((tire) => (
+                  <Card key={tire.id} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+                    <Box sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{tire.customer_name}</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.6 }}>{tire.plate_number}</Typography>
+                        </Box>
+                        <Chip 
+                          label={tire.retrieved ? 'RELEASED' : 'SECURED'} 
+                          size="small" 
+                          color={tire.retrieved ? 'default' : 'secondary'} 
+                          sx={{ fontWeight: 900, borderRadius: 1.5, fontSize: '0.65rem' }} 
+                        />
+                      </Box>
+                      
+                      <Divider sx={{ my: 1.5, opacity: 0.5 }} />
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>BRAND & SIZE</Typography>
+                          <Typography sx={{ fontWeight: 700 }}>{tire.brand} • {tire.size}</Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary' }}>QUANTITY</Typography>
+                          <Typography sx={{ fontWeight: 900 }}>{tire.quantity} Units</Typography>
+                        </Box>
+                      </Box>
 
-            <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-                <DialogTitle sx={{ fontWeight: 900 }}>Secure Custodial Asset</DialogTitle>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {!tire.retrieved && (
+                          <Button 
+                            fullWidth
+                            variant="contained" 
+                            color="secondary" 
+                            startIcon={<ReleaseIcon />}
+                            onClick={() => handleRelease(tire.id)}
+                            sx={{ borderRadius: 2, fontWeight: 900 }}
+                          >
+                            RELEASE
+                          </Button>
+                        )}
+                        <IconButton 
+                          size="small" 
+                          color="error" 
+                          onClick={() => handleDelete(tire.id)}
+                          sx={{ bgcolor: 'rgba(244,67,54,0.05)', borderRadius: 2 }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+                  <StyledDataGrid 
+                      rows={filteredTires} 
+                      columns={columns} 
+                      autoHeight 
+                      components={{ Toolbar: GridToolbar }} 
+                      getRowId={(r) => r.id}
+                  />
+              </Card>
+            )}
+
+            <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} fullScreen={isMobile} PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4, p: isMobile ? 0 : 2 } }}>
+                <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  Secure Custodial Asset
+                  {isMobile && <IconButton onClick={() => setIsAddDialogOpen(false)}><AddIcon sx={{ transform: 'rotate(45deg)' }} /></IconButton>}
+                </DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
                     <MuiTextField fullWidth label="Customer Name" variant="standard" value={newAsset.customer_name} onChange={e => setNewAsset({...newAsset, customer_name: e.target.value})} />
                     <Grid container spacing={2}>

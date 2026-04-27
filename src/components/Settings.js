@@ -3,7 +3,7 @@ import {
     Box, Typography, TextField, Button, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     IconButton, Alert, CircularProgress, Avatar, Chip, Card, CardContent,
-    FormControl, InputLabel, Select, MenuItem, useMediaQuery
+    FormControl, InputLabel, Select, MenuItem, useMediaQuery, Paper
 } from '@mui/material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -328,33 +328,36 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                         <TextField fullWidth label="Business Name" value={businessProfile.name || ''} onChange={(e) => setBusinessProfile({ ...businessProfile, name: e.target.value })} variant="outlined" InputProps={{ sx: { borderRadius: 3 } }} />
                                     </Grid>
                                     <Grid item xs={12}>
-                                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box sx={{ mb: 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'center' : 'center', gap: 2, textAlign: isMobile ? 'center' : 'left' }}>
                                             {businessProfile.logo_url && (
                                                 <Avatar 
                                                     src={businessProfile.logo_url} 
                                                     variant="rounded" 
-                                                    sx={{ width: 64, height: 64, border: '1px solid rgba(0,0,0,0.1)' }} 
+                                                    sx={{ width: isMobile ? 80 : 64, height: isMobile ? 80 : 64, border: '1px solid rgba(0,0,0,0.1)' }} 
                                                 />
                                             )}
-                                            <Button
-                                                variant="outlined"
-                                                component="label"
-                                                disabled={saving}
-                                                sx={{ borderRadius: 3 }}
-                                            >
-                                                Upload Business Logo
-                                                <input
-                                                    type="file"
-                                                    hidden
-                                                    accept="image/*"
-                                                    onChange={handleLogoUpload}
-                                                />
-                                            </Button>
-                                            {businessProfile.logo_url && (
-                                                <Typography variant="caption" color="text.secondary">
-                                                    Current logo loaded
-                                                </Typography>
-                                            )}
+                                            <Box>
+                                                <Button
+                                                    variant="outlined"
+                                                    component="label"
+                                                    disabled={saving}
+                                                    fullWidth={isMobile}
+                                                    sx={{ borderRadius: 3, mb: isMobile ? 1 : 0 }}
+                                                >
+                                                    Upload Business Logo
+                                                    <input
+                                                        type="file"
+                                                        hidden
+                                                        accept="image/*"
+                                                        onChange={handleLogoUpload}
+                                                    />
+                                                </Button>
+                                                {businessProfile.logo_url && (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                        Current logo loaded
+                                                    </Typography>
+                                                )}
+                                            </Box>
                                         </Box>
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
@@ -370,7 +373,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                             size="large"
                                             fullWidth
                                             disabled={saving}
-                                            sx={{ py: 1.5, borderRadius: 3, fontWeight: 800, fontSize: '1rem', boxShadow: '0 4px 14px 0 rgba(26, 35, 126, 0.39)' }}
+                                            sx={{ py: 1.5, borderRadius: 3, fontWeight: 800, fontSize: isMobile ? '0.9rem' : '1rem', boxShadow: '0 4px 14px 0 rgba(26, 35, 126, 0.39)' }}
                                             startIcon={<SaveIcon />}
                                         >
                                             Update Business Identity
@@ -432,7 +435,7 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                             </Box>
 
                             <Box component="form" onSubmit={handleAddUser} sx={{ mb: 4 }}>
-                                <Grid container spacing={1.5}>
+                                <Grid container spacing={isMobile ? 2 : 1.5}>
                                     <Grid item xs={12} sm={6} md={3}>
                                         <TextField fullWidth size="small" placeholder="Full Name" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} InputProps={{ sx: { borderRadius: 2 } }} />
                                     </Grid>
@@ -466,62 +469,102 @@ const Settings = ({ businessProfile: propBusinessProfile, masterData: propMaster
                                 Tip: Click on a user's role chip (STAFF/ADMIN) to toggle their authority level.
                             </Typography>
 
-                            <TableContainer sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-                                <Table size="small">
-                                    <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.04)' }}>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }}>USER IDENTITY</TableCell>
-                                            <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }}>AUTHORITY</TableCell>
-                                            <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }} align="center">ACCESS</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {users.filter(u => u.role !== 'revoked').map((u) => (
-                                            <TableRow key={u.id} hover>
-                                                <TableCell sx={{ py: 2 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                        <Avatar sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main', mr: 2, fontWeight: 700 }}>{u.name?.[0] || 'U'}</Avatar>
-                                                        <Box>
-                                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{u.name}</Typography>
-                                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{u.email}</Typography>
-                                                        </Box>
-                                                    </Box>
-                                                </TableCell>
-                                                <TableCell>
-                                                     <Chip
+                            {isMobile ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {users.filter(u => u.role !== 'revoked').map((u) => (
+                                        <Paper key={u.id} variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Avatar sx={{ width: 40, height: 40, fontSize: 16, bgcolor: 'primary.main', mr: 2, fontWeight: 700 }}>{u.name?.[0] || 'U'}</Avatar>
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{u.name}</Typography>
+                                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{u.email}</Typography>
+                                                    <Chip
                                                         label={(u.role || 'staff').toUpperCase()}
                                                         size="small"
                                                         onClick={() => handleRoleToggle(u)}
                                                         disabled={u.email === currentUser?.email}
-                                                        title={u.email === currentUser?.email ? 'Cannot change your own role' : 'Click to toggle role'}
                                                         sx={{
+                                                            mt: 0.5,
                                                             fontWeight: 800,
-                                                            fontSize: '10px',
+                                                            fontSize: '9px',
+                                                            height: 18,
                                                             bgcolor: u.role === 'admin' ? 'secondary.main' : 'rgba(0,0,0,0.06)',
                                                             color: u.role === 'admin' ? '#fff' : 'inherit',
-                                                            borderRadius: 1,
-                                                            cursor: u.email === currentUser?.email ? 'default' : 'pointer',
-                                                            '&:hover': u.email === currentUser?.email ? {} : { bgcolor: u.role === 'admin' ? 'secondary.dark' : 'rgba(0,0,0,0.1)' }
+                                                            borderRadius: 1
                                                         }}
                                                     />
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleDeleteUser(u.id, u.email)}
-                                                        disabled={u.email === currentUser?.email}
-                                                        title={u.email === currentUser?.email ? 'Cannot remove your own account' : 'Revoke access'}
-                                                        color="error"
-                                                        sx={{ bgcolor: 'rgba(244, 67, 54, 0.05)' }}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </TableCell>
+                                                </Box>
+                                            </Box>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleDeleteUser(u.id, u.email)}
+                                                disabled={u.email === currentUser?.email}
+                                                color="error"
+                                                sx={{ bgcolor: 'rgba(244, 67, 54, 0.05)' }}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </Paper>
+                                    ))}
+                                </Box>
+                            ) : (
+                                <TableContainer sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                                    <Table size="small">
+                                        <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.04)' }}>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }}>USER IDENTITY</TableCell>
+                                                <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }}>AUTHORITY</TableCell>
+                                                <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 1.5 }} align="center">ACCESS</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
+                                        </TableHead>
+                                        <TableBody>
+                                            {users.filter(u => u.role !== 'revoked').map((u) => (
+                                                <TableRow key={u.id} hover>
+                                                    <TableCell sx={{ py: 2 }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                            <Avatar sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main', mr: 2, fontWeight: 700 }}>{u.name?.[0] || 'U'}</Avatar>
+                                                            <Box>
+                                                                <Typography variant="body2" sx={{ fontWeight: 700 }}>{u.name}</Typography>
+                                                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{u.email}</Typography>
+                                                            </Box>
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                         <Chip
+                                                            label={(u.role || 'staff').toUpperCase()}
+                                                            size="small"
+                                                            onClick={() => handleRoleToggle(u)}
+                                                            disabled={u.email === currentUser?.email}
+                                                            title={u.email === currentUser?.email ? 'Cannot change your own role' : 'Click to toggle role'}
+                                                            sx={{
+                                                                fontWeight: 800,
+                                                                fontSize: '10px',
+                                                                bgcolor: u.role === 'admin' ? 'secondary.main' : 'rgba(0,0,0,0.06)',
+                                                                color: u.role === 'admin' ? '#fff' : 'inherit',
+                                                                borderRadius: 1,
+                                                                cursor: u.email === currentUser?.email ? 'default' : 'pointer',
+                                                                '&:hover': u.email === currentUser?.email ? {} : { bgcolor: u.role === 'admin' ? 'secondary.dark' : 'rgba(0,0,0,0.1)' }
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleDeleteUser(u.id, u.email)}
+                                                            disabled={u.email === currentUser?.email}
+                                                            title={u.email === currentUser?.email ? 'Cannot remove your own account' : 'Revoke access'}
+                                                            color="error"
+                                                            sx={{ bgcolor: 'rgba(244, 67, 54, 0.05)' }}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>

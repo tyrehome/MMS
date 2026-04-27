@@ -4,7 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, TextField, Select,
   MenuItem, FormControl, InputLabel, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, Snackbar, Tab, Tabs, ToggleButton, ToggleButtonGroup, useMediaQuery
+  LinearProgress, Snackbar, Tab, Tabs, ToggleButton, ToggleButtonGroup, useMediaQuery, Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -211,99 +211,191 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
             </ToggleButtonGroup>
           </Box>
 
-          <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <TableContainer sx={{ overflowX: 'auto' }}>
-              <Table>
-                <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 900, py: 3 }}>OPERATIVE</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>CUSTOMER / VEHICLE</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>TASK</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>STATUS</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 900 }}>ACTION</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tasks
-                    .filter(t => {
-                      if (taskFilter === 'Active') return t.status !== 'Completed';
-                      if (taskFilter === 'Completed') return t.status === 'Completed';
-                      return true;
-                    })
-                    .map(task => (
-                    <TableRow key={task.id} hover>
-                      <TableCell sx={{ fontWeight: 800 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.main' }}>
-                            {workers.find(w => w.id === task.worker_id)?.name?.[0] || '?'}
-                          </Avatar>
-                          {workers.find(w => w.id === task.worker_id)?.name}
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {tasks
+                .filter(t => {
+                  if (taskFilter === 'Active') return t.status !== 'Completed';
+                  if (taskFilter === 'Completed') return t.status === 'Completed';
+                  return true;
+                })
+                .map(task => {
+                  const worker = workers.find(w => w.id === task.worker_id);
+                  return (
+                    <Card key={task.id} sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
+                      <Box sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.8rem', fontWeight: 900 }}>
+                              {worker?.name?.[0] || '?'}
+                            </Avatar>
+                            <Box>
+                              <Typography sx={{ fontWeight: 900, fontSize: '0.85rem' }}>{worker?.name}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Operative</Typography>
+                            </Box>
+                          </Box>
+                          <Box sx={{ textAlign: 'right' }}>
+                            <Chip 
+                              label={task.status} 
+                              size="small" 
+                              color={task.status === 'Completed' ? 'success' : 'primary'} 
+                              sx={{ fontWeight: 900, borderRadius: 1.5, fontSize: '0.6rem' }} 
+                            />
+                            {task.priority === 'High' && (
+                              <Chip label="Urgent" size="small" color="error" sx={{ ml: 0.5, height: 18, fontSize: '0.55rem', fontWeight: 900 }} />
+                            )}
+                          </Box>
                         </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{task.customer_name || 'Walk-in'}</Typography>
-                        <Typography variant="caption" sx={{ opacity: 0.6, fontWeight: 700 }}>{task.vehicle_number}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{task.task}</Typography>
-                        <Typography variant="caption" sx={{ display: 'block', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {task.details || 'No additional notes'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
-                           Started: {task.time}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={task.status} 
-                          size="small" 
-                          color={task.status === 'Completed' ? 'success' : 'primary'} 
-                          sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.65rem' }} 
-                        />
-                        {task.priority === 'High' && <Chip label="Urgent" size="small" color="error" sx={{ ml: 1, height: 20, fontSize: '0.6rem', fontWeight: 900 }} />}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        
+                        <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
+                        
+                        <Box sx={{ mb: 1.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', display: 'block' }}>Client / Vehicle</Typography>
+                          <Typography sx={{ fontWeight: 800 }}>{task.customer_name || 'Walk-in'} • {task.vehicle_number}</Typography>
+                        </Box>
+
+                        <Box sx={{ mb: 2, p: 1.5, bgcolor: 'rgba(26, 35, 126, 0.03)', borderRadius: 2 }}>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: '0.9rem' }}>{task.task}</Typography>
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{task.details || 'No additional notes'}</Typography>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, mt: 1, display: 'block' }}>Started at {task.time}</Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                           {task.status !== 'Completed' && (
-                            <IconButton color="success" onClick={() => completeTask(task.id)}>
-                              <CheckCircleIcon />
-                            </IconButton>
+                            <Button 
+                              fullWidth
+                              variant="contained" 
+                              color="success" 
+                              startIcon={<CheckCircleIcon />}
+                              onClick={() => completeTask(task.id)}
+                              sx={{ borderRadius: 2, fontWeight: 900 }}
+                            >
+                              MARK ACHIEVED
+                            </Button>
                           )}
                           {task.status === 'Completed' && !task.is_billed && (
                             <Button 
-                              size="small" 
+                              fullWidth
                               variant="contained" 
                               color="secondary" 
                               onClick={() => handleBillTask(task)}
-                              sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.7rem' }}
+                              sx={{ fontWeight: 900, borderRadius: 2 }}
                             >
                               GENERATE BILL
                             </Button>
                           )}
                           {task.is_billed && (
-                            <Chip label="BILLED" size="small" variant="outlined" color="success" sx={{ fontWeight: 900, fontSize: '0.6rem' }} />
+                            <Chip label="BILLED & SYNCED" fullWidth size="small" variant="outlined" color="success" sx={{ width: '100%', fontWeight: 900 }} />
                           )}
                         </Box>
-                      </TableCell>
+                      </Box>
+                    </Card>
+                  );
+                })}
+              {tasks.filter(t => taskFilter === 'All' || (taskFilter === 'Active' ? t.status !== 'Completed' : t.status === 'Completed')).length === 0 && (
+                 <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                   <Typography sx={{ fontWeight: 700 }}>No {taskFilter.toLowerCase()} missions.</Typography>
+                 </Box>
+              )}
+            </Box>
+          ) : (
+            <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <TableContainer sx={{ overflowX: 'auto' }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: 'rgba(26, 35, 126, 0.03)' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 900, py: 3 }}>OPERATIVE</TableCell>
+                      <TableCell sx={{ fontWeight: 900 }}>CUSTOMER / VEHICLE</TableCell>
+                      <TableCell sx={{ fontWeight: 900 }}>TASK</TableCell>
+                      <TableCell sx={{ fontWeight: 900 }}>STATUS</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 900 }}>ACTION</TableCell>
                     </TableRow>
-                  ))}
-                  {tasks.filter(t => taskFilter === 'All' || (taskFilter === 'Active' ? t.status !== 'Completed' : t.status === 'Completed')).length === 0 && (
-                     <TableRow>
-                       <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
-                         No {taskFilter.toLowerCase()} missions in the queue.
-                       </TableCell>
-                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
+                  </TableHead>
+                  <TableBody>
+                    {tasks
+                      .filter(t => {
+                        if (taskFilter === 'Active') return t.status !== 'Completed';
+                        if (taskFilter === 'Completed') return t.status === 'Completed';
+                        return true;
+                      })
+                      .map(task => (
+                      <TableRow key={task.id} hover>
+                        <TableCell sx={{ fontWeight: 800 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar sx={{ width: 24, height: 24, fontSize: '0.7rem', bgcolor: 'primary.main' }}>
+                              {workers.find(w => w.id === task.worker_id)?.name?.[0] || '?'}
+                            </Avatar>
+                            {workers.find(w => w.id === task.worker_id)?.name}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{task.customer_name || 'Walk-in'}</Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.6, fontWeight: 700 }}>{task.vehicle_number}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{task.task}</Typography>
+                          <Typography variant="caption" sx={{ display: 'block', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {task.details || 'No additional notes'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                             Started: {task.time}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={task.status} 
+                            size="small" 
+                            color={task.status === 'Completed' ? 'success' : 'primary'} 
+                            sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.65rem' }} 
+                          />
+                          {task.priority === 'High' && <Chip label="Urgent" size="small" color="error" sx={{ ml: 1, height: 20, fontSize: '0.6rem', fontWeight: 900 }} />}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                            {task.status !== 'Completed' && (
+                              <IconButton color="success" onClick={() => completeTask(task.id)}>
+                                <CheckCircleIcon />
+                              </IconButton>
+                            )}
+                            {task.status === 'Completed' && !task.is_billed && (
+                              <Button 
+                                size="small" 
+                                variant="contained" 
+                                color="secondary" 
+                                onClick={() => handleBillTask(task)}
+                                sx={{ fontWeight: 900, borderRadius: 2, fontSize: '0.7rem' }}
+                              >
+                                GENERATE BILL
+                              </Button>
+                            )}
+                            {task.is_billed && (
+                              <Chip label="BILLED" size="small" variant="outlined" color="success" sx={{ fontWeight: 900, fontSize: '0.6rem' }} />
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {tasks.filter(t => taskFilter === 'All' || (taskFilter === 'Active' ? t.status !== 'Completed' : t.status === 'Completed')).length === 0 && (
+                       <TableRow>
+                         <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontWeight: 700 }}>
+                           No {taskFilter.toLowerCase()} missions in the queue.
+                         </TableCell>
+                       </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+          )}
         </Box>
       )}
 
 
-      <Dialog open={isWorkerModalOpen} onClose={() => setIsWorkerModalOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Operative Onboarding</DialogTitle>
+      <Dialog open={isWorkerModalOpen} onClose={() => setIsWorkerModalOpen(false)} fullScreen={isMobile} PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4, p: isMobile ? 0 : 2 } }}>
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Operative Onboarding
+          {isMobile && <IconButton onClick={() => setIsWorkerModalOpen(false)}><AddIcon sx={{ transform: 'rotate(45deg)' }} /></IconButton>}
+        </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
           <TextField fullWidth label="Full Name" variant="standard" value={workerFormData.name} onChange={e => setWorkerFormData({...workerFormData, name: e.target.value})} />
           <TextField fullWidth label="Designated Role" variant="standard" value={workerFormData.role} onChange={e => setWorkerFormData({...workerFormData, role: e.target.value})} />
@@ -313,8 +405,11 @@ const WorkerTracking = ({ workersList = [], tasksList = [], setBillingDraft, set
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Technical Task Deployment</DialogTitle>
+      <Dialog open={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} fullScreen={isMobile} PaperProps={{ sx: { borderRadius: isMobile ? 0 : 4, p: isMobile ? 0 : 2 } }}>
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            Technical Task Deployment
+            {isMobile && <IconButton onClick={() => setIsTaskModalOpen(false)}><AddIcon sx={{ transform: 'rotate(45deg)' }} /></IconButton>}
+        </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
             <FormControl fullWidth variant="outlined">
                 <InputLabel>Task Type</InputLabel>
