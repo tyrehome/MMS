@@ -1030,16 +1030,23 @@ const Reports = ({ tires = [], sales = [], accounts = [], invoices = [], supplie
                                                         {(() => {
                                                             try {
                                                                 const details = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
-                                                                return Object.entries(details).map(([k, v]) => (
-                                                                    <Box key={k}>
-                                                                        <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
-                                                                            {k.replace(/_/g, ' ')}
-                                                                        </Typography>
-                                                                        <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
-                                                                            {typeof v === 'object' ? JSON.stringify(v) : v?.toString()}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                ));
+                                                                return Object.entries(details).map(([k, v]) => {
+                                                                    let displayValue = v?.toString();
+                                                                    if (k === 'account_id' && v && v !== 'Cash Transaction') {
+                                                                        const acc = accounts.find(a => a.id === v);
+                                                                        if (acc) displayValue = acc.name;
+                                                                    }
+                                                                    return (
+                                                                        <Box key={k}>
+                                                                            <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', color: 'text.disabled', fontWeight: 900, display: 'block' }}>
+                                                                                {k === 'account_id' ? 'ACCOUNT' : k.replace(/_/g, ' ')}
+                                                                            </Typography>
+                                                                            <Typography sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+                                                                                {typeof v === 'object' ? JSON.stringify(v) : displayValue}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    );
+                                                                });
                                                             } catch (e) {
                                                                 return <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.notes || '—'}</Typography>;
                                                             }
