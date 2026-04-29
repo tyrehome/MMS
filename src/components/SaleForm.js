@@ -91,6 +91,12 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
       .reduce((sum, l) => sum + parseInt(l.current_qty || 0), 0);
   };
 
+  const getExpiringUnitsForTire = (tireId) => {
+    return lotAging
+      .filter(l => l.tire_id === tireId && (l.age_status === 'Expiring Soon' || l.age_status === 'Critical'))
+      .reduce((sum, l) => sum + parseInt(l.current_qty || 0), 0);
+  };
+
   const ageBadgeStyle = (status) => {
     if (status === 'Expired')       return { bg: '#ffebee', color: '#c62828', icon: '🔴', label: 'EXPIRED — Do Not Sell' };
     if (status === 'Critical')      return { bg: '#fff3e0', color: '#e65100', icon: '🟠', label: 'Urgent — Sell First!' };
@@ -620,6 +626,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                                              
                   const oldestLot = item.type === 'tire' ? getOldestLot(item.id) : null;
                   const expiredUnits = item.type === 'tire' ? getExpiredUnitsForTire(item.id) : 0;
+                  const expiringUnits = item.type === 'tire' ? getExpiringUnitsForTire(item.id) : 0;
                   const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
 
                   return (
@@ -646,10 +653,15 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                               size="small"
                               sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: typeColor.bg, color: typeColor.fg }}
                             />
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                               {expiredUnits > 0 && (
-                                <Tooltip title="Total Expired Units">
-                                  <Chip label={`${expiredUnits} Expired`} size="small" sx={{ fontWeight:900, height:18, fontSize:'0.6rem', bgcolor:'#c62828', color:'#fff' }} />
+                                <Tooltip title={`${expiredUnits} expired unit(s) — Do not sell`}>
+                                  <Chip label={`🔴 ${expiredUnits} Exp`} size="small" sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: '#c62828', color: '#fff' }} />
+                                </Tooltip>
+                              )}
+                              {expiringUnits > 0 && (
+                                <Tooltip title={`${expiringUnits} unit(s) expiring soon — Sell first!`}>
+                                  <Chip label={`🟡 ${expiringUnits} Soon`} size="small" sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem', bgcolor: '#f57f17', color: '#fff' }} />
                                 </Tooltip>
                               )}
                               {item.stock !== null && (
@@ -736,6 +748,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                 {selectedCategory === 'tires' && tires.filter(t => t.brand?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => {
                   const oldestLot = getOldestLot(t.id);
                   const expiredUnits = getExpiredUnitsForTire(t.id);
+                  const expiringUnits = getExpiringUnitsForTire(t.id);
                   const badge = oldestLot ? ageBadgeStyle(oldestLot.age_status) : null;
                   return (
                   <Grid item xs={6} sm={6} md={4} key={t.id}>
@@ -774,9 +787,16 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
                           <Typography sx={{ fontWeight: 900, color: 'primary.main', fontSize: isMobile ? '0.85rem' : '1rem', lineHeight: 1 }}>{Number(t.price).toLocaleString()}</Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5, mb: 1 }}>
                             <Typography sx={{ fontWeight: 700, fontSize: '0.6rem', color: 'text.secondary' }}>{currency}</Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                               {expiredUnits > 0 && (
-                                <Chip label={`${expiredUnits} Exp!`} size="small" sx={{ fontWeight: 900, height: 16, fontSize: '0.55rem', bgcolor: '#c62828', color: '#fff', '& .MuiChip-label': { px: 0.5 } }} />
+                                <Tooltip title={`${expiredUnits} expired unit(s) — Do not sell`}>
+                                  <Chip label={`🔴 ${expiredUnits} Exp`} size="small" sx={{ fontWeight: 900, height: 16, fontSize: '0.55rem', bgcolor: '#c62828', color: '#fff', '& .MuiChip-label': { px: 0.5 } }} />
+                                </Tooltip>
+                              )}
+                              {expiringUnits > 0 && (
+                                <Tooltip title={`${expiringUnits} unit(s) expiring soon — Sell first!`}>
+                                  <Chip label={`🟡 ${expiringUnits} Soon`} size="small" sx={{ fontWeight: 900, height: 16, fontSize: '0.55rem', bgcolor: '#f57f17', color: '#fff', '& .MuiChip-label': { px: 0.5 } }} />
+                                </Tooltip>
                               )}
                               <Chip label={`${t.stock}`} size="small" color={t.stock <= 0 ? 'error' : t.stock <= 3 ? 'warning' : 'default'} sx={{ fontWeight: 900, height: 16, fontSize: '0.6rem', '& .MuiChip-label': { px: 0.8 } }} />
                             </Box>
