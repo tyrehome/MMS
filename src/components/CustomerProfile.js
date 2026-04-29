@@ -8,7 +8,7 @@ import {
 import {
   Person, DirectionsCar, Hotel, 
   LocalPhone, Email, 
-  Receipt, Warning, CalendarMonth, SettingsAccessibility,
+  Receipt, Warning, CalendarMonth, SettingsAccessibility, Sync as SyncIcon,
   Add as AddIcon, PhoneInTalk as PhoneIcon, ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { 
@@ -27,6 +27,7 @@ const CustomerProfile = ({
   hotelTires = [], 
   appointments = [],
   sales = [],
+  retreadJobs = [],
   businessProfile
 }) => {
   const theme = useTheme();
@@ -66,6 +67,7 @@ const CustomerProfile = ({
   const customerVehicles = vehicles.filter(v => v.customer_name === selectedCustomer?.name);
   const customerAccount = accounts.find(a => a.customer_name === selectedCustomer?.name);
   const customerHotel = hotelTires.filter(h => h.customer_name === selectedCustomer?.name);
+  const customerRetreads = retreadJobs.filter(r => r.customer_name === selectedCustomer?.name);
   const customerSales = sales.filter(s => s.customer_name === selectedCustomer?.name);
   const totalSpent = customerSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
 
@@ -256,6 +258,7 @@ const CustomerProfile = ({
                   <Tab label="Financials" />
                   <Tab label="Vehicles" />
                   <Tab label="Storage" />
+                  <Tab label="Retreads" />
                   <Tab label="History" />
                 </Tabs>
 
@@ -331,6 +334,30 @@ const CustomerProfile = ({
                   )}
 
                   {tabLevel2 === 3 && (
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Retread & Casing Jobs</Typography>
+                      {customerRetreads.length === 0 && (
+                        <Typography sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>No retread jobs for this customer.</Typography>
+                      )}
+                      {customerRetreads.map(r => (
+                        <Paper key={r.id} variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+                          <Grid container alignItems="center">
+                            <Grid item xs={2} sx={{ textAlign: 'center' }}><SyncIcon color="primary" /></Grid>
+                            <Grid item xs={10}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography sx={{ fontWeight: 800 }}>{r.brand} {r.size}</Typography>
+                                <Chip label={r.status} size="small" color={r.status === 'Returned' ? 'success' : r.status === 'Sold' ? 'default' : 'warning'} sx={{ fontWeight: 900, fontSize: '0.65rem' }} />
+                              </Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Serial: {r.serial_number}</Typography>
+                              <Typography variant="caption" color="text.secondary">Received: {format(new Date(r.created_at), 'PPP')}</Typography>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+                      ))}
+                    </Box>
+                  )}
+
+                  {tabLevel2 === 4 && (
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Recent Invoices</Typography>
                       <List sx={{ p: 0 }}>

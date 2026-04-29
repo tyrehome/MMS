@@ -1042,3 +1042,26 @@ BEGIN
     END LOOP;
 END $$;
 
+-- ==========================================
+-- CASING & RETREAD JOBS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.retread_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name TEXT,
+    customer_phone TEXT,
+    vehicle_number TEXT,
+    brand TEXT,
+    size TEXT,
+    serial_number TEXT,
+    supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+    job_number TEXT,
+    status TEXT DEFAULT 'Received', -- 'Received', 'Sent to Supplier', 'Supplier Rejected', 'Returned', 'Sold'
+    cost_price NUMERIC DEFAULT 0,
+    selling_price NUMERIC DEFAULT 0,
+    sale_id UUID REFERENCES public.sales(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.retread_jobs REPLICA IDENTITY FULL;
+

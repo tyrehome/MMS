@@ -21,7 +21,8 @@ import {
   Close as CloseIcon,
   Refresh as RefreshIcon,
   Translate as TranslateIcon,
-  Description as QuoteIcon
+  Description as QuoteIcon,
+  Sync as SyncIcon
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
@@ -60,7 +61,7 @@ const ReceiptStyles = `
   .receipt-container .dev-credit { font-size: 7px; opacity: 0.6; margin-top: 6px; text-align: center; }
 `;
 
-const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft }) => {
+const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft, retreadJobs = [] }) => {
   const { t, receiptLang, toggleReceiptLang } = useLanguage();
   const { isAdmin } = useAuth();
   const isMobile = useMediaQuery('(max-width:600px)');
@@ -227,6 +228,14 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     };
     const result = await addSale(saleData);
     if (result.success) {
+      // Mark any billed retread jobs as Sold
+      const retreadItems = saleData.items.filter(i => i.retread_job_id);
+      for (const item of retreadItems) {
+         try {
+             await supabase.from('retread_jobs').update({ status: 'Sold', sale_id: result.data.sale_id }).eq('id', item.retread_job_id);
+         } catch (err) { console.error("Failed to update retread status:", err); }
+      }
+
       if (shouldPrint) {
         // Use database ID for stable bill numbering
         const vBillNo = result.data?.sale_id ? `INV-${result.data.sale_id.substring(0, 8).toUpperCase()}` : `INV-${Date.now().toString().slice(-4)}`;
@@ -455,6 +464,45 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
               </Grid>
             </CardContent>
           </Card>
+          </Grid>
+        )}
+
+        {/* Pending Retreads Alert */}
+        {(!isMobile || (isMobile && mobileTab === 0)) && invoice.customer_name && retreadJobs?.some(j => j.status === 'Returned' && (j.customer_name?.toLowerCase() === invoice.customer_name?.toLowerCase() || j.vehicle_number?.toLowerCase() === invoice.vehicle_number?.toLowerCase())) && (
+          <Grid item xs={12}>
+            <Alert severity="info" sx={{ borderRadius: 3, border: '1px solid #0288d1', bgcolor: '#e1f5fe' }}>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#01579b', mb: 1 }}>
+                    <SyncIcon sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
+                    This customer has finished Retread Casings ready to be billed!
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {retreadJobs.filter(j => j.status === 'Returned' && (j.customer_name?.toLowerCase() === invoice.customer_name?.toLowerCase() || j.vehicle_number?.toLowerCase() === invoice.vehicle_number?.toLowerCase())).map(job => (
+                        <Button 
+                            key={job.id} 
+                            size="small" 
+                            variant="contained" 
+                            color="info"
+                            disabled={invoice.items.some(i => i.retread_job_id === job.id)}
+                            onClick={() => {
+                                setInvoice(prev => ({
+                                    ...prev,
+                                    items: [...prev.items, {
+                                        id: `retread-${job.id}`,
+                                        type: 'service',
+                                        service_name: `Retreaded Tire: ${job.brand} ${job.size} (SN: ${job.serial_number})`,
+                                        price: job.selling_price || 0,
+                                        quantity: 1,
+                                        retread_job_id: job.id
+                                    }]
+                                }));
+                            }}
+                            sx={{ borderRadius: 2, fontWeight: 900, textTransform: 'none' }}
+                        >
+                            {invoice.items.some(i => i.retread_job_id === job.id) ? `Added: ${job.brand} (SN: ${job.serial_number})` : `Add ${job.brand} (SN: ${job.serial_number}) to Bill — ${Number(job.selling_price || 0).toLocaleString()} ${currency}`}
+                        </Button>
+                    ))}
+                </Box>
+            </Alert>
           </Grid>
         )}
 

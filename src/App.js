@@ -52,6 +52,8 @@ import Settings from "./components/Settings";
 import CustomerProfile from "./components/CustomerProfile";
 import WorkerTracking from "./components/WorkerTracking";
 import SupplierManagement from "./components/SupplierManagement";
+import CasingManagement from "./components/CasingManagement";
+import SyncIcon from "@mui/icons-material/Sync";
 
 const SupplierIcon = LocalShippingIcon;
 const drawerWidth = 240;
@@ -136,6 +138,7 @@ const AppContent = () => {
   const [vehicles, setVehicles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [inventoryLots, setInventoryLots] = useState([]);
+  const [retreadJobs, setRetreadJobs] = useState([]);
   const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -207,6 +210,7 @@ const AppContent = () => {
       fetchData('vehicles', setVehicles);
       fetchData('suppliers', setSuppliers);
       fetchData('inventory_lots', setInventoryLots);
+      fetchData('retread_jobs', setRetreadJobs);
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
@@ -226,7 +230,8 @@ const AppContent = () => {
             accounts: setAccounts, parts: setParts, customers: setCustomers,
             appointments: setAppointments, invoices: setInvoices,
             workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
-            suppliers: setSuppliers, inventory_lots: setInventoryLots
+            suppliers: setSuppliers, inventory_lots: setInventoryLots,
+            retread_jobs: setRetreadJobs
           };
           if (tableMap[table]) {
             fetchData(table, tableMap[table]);
@@ -489,6 +494,27 @@ const AppContent = () => {
     }
   };
 
+  const addRetreadJob = async (job) => {
+    try {
+      const { error } = await supabase.from('retread_jobs').insert([job]);
+      if (!error) recordAudit('Add Casing Job', { serial_number: job.serial_number }, 'retread_jobs');
+    } catch (e) { console.error(e); }
+  };
+
+  const updateRetreadJob = async (id, updatedData) => {
+    try {
+      const { error } = await supabase.from('retread_jobs').update(updatedData).eq('id', id);
+      if (!error) recordAudit('Update Casing Job', { id, ...updatedData }, 'retread_jobs');
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteRetreadJob = async (id) => {
+    try {
+      const { error } = await supabase.from('retread_jobs').delete().eq('id', id);
+      if (!error) recordAudit('Delete Casing Job', { id }, 'retread_jobs');
+    } catch (e) { console.error(e); }
+  };
+
   const handleDrawerToggle = () => setOpen(!open);
   const handleMenu = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -504,6 +530,7 @@ const AppContent = () => {
     { text: "Sales & POS", icon: <SellIcon />, component: "SaleForm" },
     { text: "Customer CRM", icon: <PersonIcon />, component: "CustomerCRM" },
     { text: "Workshop", icon: <BuildCircleIcon />, component: "Workshop" },
+    { text: "Retreads & Casing", icon: <SyncIcon />, component: "CasingManagement" },
     { text: "Vendors & GRN", icon: <SupplierIcon />, component: "Suppliers", adminOnly: true },
     { text: "Finance Hub", icon: <AccountBalanceWalletIcon />, component: "Finance", adminOnly: true },
     { text: "360 Reports", icon: <AssessmentIcon />, component: "Reports", adminOnly: true },
@@ -582,7 +609,7 @@ const AppContent = () => {
   );
   const renderComponent = () => {
     const commonProps = { businessProfile, masterData, suppliers, parts, recordAudit, isAdmin };
-    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} {...commonProps} />;
+    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} retreadJobs={retreadJobs || []} {...commonProps} />;
 
     switch (selectedComponent) {
       case "Dashboard": 
@@ -618,7 +645,8 @@ const AppContent = () => {
       case "CustomerCRM": 
         return <CustomerProfile 
           customers={customers || []} vehicles={vehicles || []} accounts={accounts || []} 
-          hotelTires={hotelTires || []} appointments={appointments || []} sales={sales || []} 
+          hotelTires={hotelTires || []} appointments={appointments || []} sales={sales || []}
+          retreadJobs={retreadJobs || []} 
           {...commonProps} 
         />;
       
@@ -633,6 +661,9 @@ const AppContent = () => {
       
       case "Suppliers":
         return isAdmin ? <SupplierManagement suppliers={suppliers || []} updateSupplier={updateSupplier} deleteSupplier={deleteSupplier} {...commonProps} /> : posComponent;
+
+      case "CasingManagement":
+        return <CasingManagement retreadJobs={retreadJobs || []} suppliers={suppliers || []} addRetreadJob={addRetreadJob} updateRetreadJob={updateRetreadJob} deleteRetreadJob={deleteRetreadJob} {...commonProps} />;
 
       case "Settings": 
         return isAdmin ? <Settings {...commonProps} /> : posComponent;
