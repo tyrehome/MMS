@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
     Typography, Box, Tab, Tabs, Grid, Card, CardContent, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-    Chip, TextField, Button, useMediaQuery, LinearProgress
+    Chip, TextField, Button, useMediaQuery, LinearProgress,
+    Collapse, IconButton, Divider
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -17,7 +18,13 @@ import {
     CalendarToday as CalendarIcon,
     GetApp as DownloadIcon,
     FlashOn as PulseIcon,
-    Refresh as RefreshIcon
+    Refresh as RefreshIcon,
+    ExpandMore as ExpandMoreIcon,
+    ExpandLess as ExpandLessIcon,
+    TireRepair as TireIcon,
+    Build as BuildIcon,
+    Settings as ServiceIcon,
+    TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -34,6 +41,8 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
     const [auditLogs, setAuditLogs] = useState([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
     const [alert, setAlert] = useState({ open: false, message: '', severity: 'info' });
+    const [profitExpanded, setProfitExpanded] = useState(false);
+    const [expandedSaleId, setExpandedSaleId] = useState(null);
 
     const currency = businessProfile?.currency || 'LKR';
 
@@ -103,6 +112,73 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
         });
         return { revenue, cogs, grossProfit: revenue - cogs };
     }, [sales, tires, parts]);
+
+    // Profit Breakdown by stream (Tires / Parts / Services) — filtered by date range
+    const profitBreakdown = useMemo(() => {
+        const streams = {
+            tires:    { label: 'Tire Sales',             revenue: 0, cost: 0, icon: '🛞', color: '#1a237e' },
+            parts:    { label: 'Parts Sales',             revenue: 0, cost: 0, icon: '🔧', color: '#6a1b9a' },
+            services: { label: 'Workspace / Services',   revenue: 0, cost: 0, icon: '⚙️', color: '#00695c' },
+        };
+        const saleRows = [];
+
+        // Filter to selected date range (same logic as pulseData)
+        const filtered = sales.filter(s => {
+            const saleDate = (s.created_at || '').split('T')[0];
+            return saleDate >= startDate && saleDate <= endDate;
+        });
+
+        filtered.forEach(sale => {
+            let saleProfit = 0;
+            const breakdown = { tires: 0, parts: 0, services: 0 };
+            (sale.sale_items || []).forEach(item => {
+                const qty  = parseInt(item.quantity || 0);
+                const sell = parseFloat(item.price || 0) * qty;
+                if (item.tire_id) {
+                    const tire = tires.find(t => t.id === item.tire_id);
+                    const cost = parseFloat(tire?.cost_price || 0) * qty;
+                    streams.tires.revenue += sell;
+                    streams.tires.cost    += cost;
+                    breakdown.tires += sell - cost;
+                    saleProfit += sell - cost;
+                } else if (item.part_id) {
+                    const part = (parts || []).find(p => p.id === item.part_id);
+                    const cost = parseFloat(part?.cost_price || 0) * qty;
+                    streams.parts.revenue += sell;
+                    streams.parts.cost    += cost;
+                    breakdown.parts += sell - cost;
+                    saleProfit += sell - cost;
+                } else {
+                    // Services: pure revenue = pure profit (no purchase cost)
+                    streams.services.revenue += sell;
+                    breakdown.services += sell;
+                    saleProfit += sell;
+                }
+            });
+            if ((sale.sale_items || []).length > 0) {
+                saleRows.push({
+                    id: sale.id,
+                    date: sale.created_at,
+                    customer: sale.customer_name || 'Walk-in',
+                    total: parseFloat(sale.total || 0),
+                    profit: saleProfit,
+                    tireProfit: breakdown.tires,
+                    partsProfit: breakdown.parts,
+                    serviceProfit: breakdown.services,
+                });
+            }
+        });
+
+        const tireProfit    = streams.tires.revenue - streams.tires.cost;
+        const partsProfit   = streams.parts.revenue - streams.parts.cost;
+        const serviceProfit = streams.services.revenue; // no COGS for services
+
+        return {
+            streams: Object.values(streams).map(s => ({ ...s, profit: s.revenue - s.cost })),
+            totalProfit: tireProfit + partsProfit + serviceProfit,
+            saleRows: saleRows.sort((a, b) => new Date(b.date) - new Date(a.date)),
+        };
+    }, [sales, tires, parts, startDate, endDate]);
 
     const movingData = useMemo(() => {
         const counts = {};
@@ -286,109 +362,189 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
 
     return (
         <Box sx={{ p: isMobile ? 0 : 2 }}>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* ── Page Header ── */}
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
                 <Box>
-                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>360 Reports</Typography>
-                    <Typography variant="body1" color="text.secondary">Comprehensive business performance & audit trails</Typography>
+                    <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ fontWeight: 900, color: 'primary.main', mb: 0.3 }}>360° Reports</Typography>
+                    {!isMobile && <Typography variant="body2" color="text.secondary">Comprehensive business performance & audit trails</Typography>}
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button variant="outlined" color="secondary" startIcon={<DownloadIcon />} onClick={handleDownload} sx={{ borderRadius: 3 }}>Export CSV</Button>
-                    <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint} sx={{ borderRadius: 3 }}>Print Page</Button>
+                <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                    <Button variant="outlined" color="secondary" startIcon={<DownloadIcon />} onClick={handleDownload}
+                        size={isMobile ? 'small' : 'medium'}
+                        sx={{ borderRadius: 3, minWidth: isMobile ? 0 : undefined, px: isMobile ? 1.5 : 2 }}>
+                        {isMobile ? '' : 'Export CSV'}{isMobile && <DownloadIcon />}
+                    </Button>
+                    <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}
+                        size={isMobile ? 'small' : 'medium'}
+                        sx={{ borderRadius: 3, minWidth: isMobile ? 0 : undefined, px: isMobile ? 1.5 : 2 }}>
+                        {isMobile ? '' : 'Print'}{isMobile && <PrintIcon />}
+                    </Button>
                 </Box>
             </Box>
 
-            <Tabs 
-                value={tabValue} 
-                onChange={(_, v) => setTabValue(v)} 
-                variant={isMobile ? "scrollable" : "standard"}
-                sx={{ mb: 4, borderBottom: '1px solid rgba(0,0,0,0.05)' }}
+            <Tabs
+                value={tabValue}
+                onChange={(_, v) => setTabValue(v)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{ mb: 3, borderBottom: '1px solid rgba(0,0,0,0.07)',
+                    '& .MuiTab-root': { minWidth: isMobile ? 80 : 140, fontSize: isMobile ? '0.7rem' : '0.875rem', px: isMobile ? 1 : 2 }
+                }}
             >
-                <Tab icon={<PulseIcon />} iconPosition="start" label="Performance Pulse" />
-                <Tab icon={<AnalyticsIcon />} iconPosition="start" label="P&L Analytics" />
-                <Tab icon={<InventoryIcon />} iconPosition="start" label="Inventory Valuation" />
-                <Tab icon={<HistoryIcon />} iconPosition="start" label="Sales History" />
-                <Tab icon={<AuditIcon />} iconPosition="start" label="Audit Trail" />
+                <Tab icon={<PulseIcon />} iconPosition="start" label={isMobile ? 'Pulse' : 'Performance Pulse'} />
+                <Tab icon={<AnalyticsIcon />} iconPosition="start" label={isMobile ? 'P&L' : 'P&L Analytics'} />
+                <Tab icon={<InventoryIcon />} iconPosition="start" label={isMobile ? 'Stock' : 'Inventory'} />
+                <Tab icon={<HistoryIcon />} iconPosition="start" label={isMobile ? 'Sales' : 'Sales History'} />
+                <Tab icon={<AuditIcon />} iconPosition="start" label={isMobile ? 'Audit' : 'Audit Trail'} />
             </Tabs>
 
             <Box id="report-content">
                 {tabValue === 0 && (
                     <Box>
-                        <Box sx={{ mb: 4, p: 3, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 4, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                        {/* ── Date Filter Bar ── */}
+                        <Box sx={{ mb: 3, p: isMobile ? 2 : 3, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <CalendarIcon color="action" />
-                                <Typography sx={{ fontWeight: 800 }}>Timeframe:</Typography>
+                                <CalendarIcon color="action" fontSize="small" />
+                                <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Period:</Typography>
                             </Box>
-                            <TextField 
-                                size="small" type="date" label="From" 
-                                value={startDate} onChange={e => setStartDate(e.target.value)} 
-                                InputLabelProps={{ shrink: true }} sx={{ width: 150 }}
-                            />
-                            <TextField 
-                                size="small" type="date" label="To" 
-                                value={endDate} onChange={e => setEndDate(e.target.value)} 
-                                InputLabelProps={{ shrink: true }} sx={{ width: 150 }}
-                            />
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button size="small" variant="outlined" onClick={() => {
-                                    const d = new Date().toISOString().split('T')[0];
-                                    setStartDate(d); setEndDate(d);
-                                }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>Today</Button>
-                                <Button size="small" variant="outlined" onClick={() => {
-                                    const d = new Date(); d.setDate(d.getDate() - 1);
-                                    const ds = d.toISOString().split('T')[0];
-                                    setStartDate(ds); setEndDate(ds);
-                                }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>Yesterday</Button>
-                                <Button size="small" variant="outlined" onClick={() => {
-                                    const d = new Date();
-                                    setEndDate(d.toISOString().split('T')[0]);
-                                    d.setDate(d.getDate() - 7);
-                                    setStartDate(d.toISOString().split('T')[0]);
-                                }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>Last 7 Days</Button>
+                            <TextField size="small" type="date" label="From" value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                                InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
+                            <TextField size="small" type="date" label="To" value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                {[['Today', 0], ['Yesterday', 1], ['7 Days', 7]].map(([lbl, days]) => (
+                                    <Button key={lbl} size="small" variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
+                                        onClick={() => {
+                                            const end = new Date(); const start = new Date();
+                                            start.setDate(start.getDate() - days);
+                                            setEndDate(end.toISOString().split('T')[0]);
+                                            setStartDate(start.toISOString().split('T')[0]);
+                                        }}>{lbl}</Button>
+                                ))}
                             </Box>
                         </Box>
 
-                        <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>Performance Breakdown</Typography>
-                        <Grid container spacing={3} sx={{ mb: 4 }}>
+                        {/* ── KPI Cards ── */}
+                        <Grid container spacing={isMobile ? 1.5 : 3} sx={{ mb: 3 }}>
                             {[
-                                { label: 'Total Revenue', value: pulseData.revenue, color: 'success.main' },
-                                { label: 'Total Profit', value: pulseData.profit, color: 'primary.main' },
-                                { label: 'Sales Count', value: pulseData.count, color: 'secondary.main', isCount: true }
+                                { label: 'Total Revenue', value: pulseData.revenue, color: '#2e7d32', bg: '#f1f8e9' },
+                                { label: 'Total Profit',  value: pulseData.profit,  color: '#1a237e', bg: '#e8eaf6' },
+                                { label: 'Sales Count',   value: pulseData.count,   color: '#6a1b9a', bg: '#f3e5f5', isCount: true },
                             ].map((s, i) => (
-                                <Grid item xs={12} md={4} key={i}>
-                                    <Card variant="outlined" sx={{ borderRadius: 4, p: 1 }}>
-                                        <CardContent>
-                                            <Typography variant="overline" sx={{ fontWeight: 900, opacity: 0.6 }}>{s.label}</Typography>
-                                            <Typography variant="h4" sx={{ fontWeight: 900, color: s.color }}>
-                                                {s.isCount ? s.value : s.value.toLocaleString()} {!s.isCount && currency}
-                                            </Typography>
-                                        </CardContent>
+                                <Grid item xs={4} key={i}>
+                                    <Card sx={{ borderRadius: 3, bgcolor: s.bg, border: `1px solid ${s.color}22`, p: isMobile ? 1 : 1.5, height: '100%' }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 800, color: s.color, opacity: 0.8, display: 'block', textTransform: 'uppercase', fontSize: isMobile ? '0.55rem' : '0.7rem' }}>{s.label}</Typography>
+                                        <Typography sx={{ fontWeight: 900, color: s.color, fontSize: isMobile ? '1.1rem' : '1.6rem', lineHeight: 1.2, mt: 0.5 }}>
+                                            {s.isCount ? s.value : s.value.toLocaleString()}
+                                        </Typography>
+                                        {!s.isCount && <Typography variant="caption" sx={{ color: s.color, opacity: 0.7, fontWeight: 700 }}>{currency}</Typography>}
                                     </Card>
                                 </Grid>
                             ))}
                         </Grid>
 
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
-                                <Card sx={{ borderRadius: 4, p: 3, border: '1px solid rgba(0,0,0,0.05)' }}>
-                                    <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 3 }}>Payment Method Split</Typography>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        {pulseData.payments.map(p => (
-                                            <Box key={p.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <Typography sx={{ fontWeight: 700 }}>{p.name}</Typography>
-                                                <Typography sx={{ fontWeight: 900 }}>{p.value.toLocaleString()} {currency}</Typography>
-                                            </Box>
-                                        ))}
-                                        {pulseData.payments.length === 0 && <Typography color="text.secondary">No sales recorded for this period.</Typography>}
+                        {/* ── Total Profit Breakdown Card ── */}
+                        <Card sx={{ borderRadius: 3, border: '2px solid #1a237e22', mb: 3, overflow: 'hidden' }}>
+                            <Box sx={{ p: isMobile ? 2 : 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                background: 'linear-gradient(135deg, #1a237e 0%, #283593 100%)', color: '#fff' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <TrendingUpIcon />
+                                    <Box>
+                                        <Typography variant="caption" sx={{ opacity: 0.8, fontWeight: 700, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Profit Breakdown</Typography>
+                                        <Typography sx={{ fontWeight: 900, fontSize: isMobile ? '1.3rem' : '1.8rem', lineHeight: 1 }}>
+                                            {profitBreakdown.totalProfit.toLocaleString()} <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{currency}</span>
+                                        </Typography>
                                     </Box>
-                                </Card>
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <Card sx={{ borderRadius: 4, p: 3, border: '1px solid rgba(0,0,0,0.05)', bgcolor: 'primary.main', color: '#fff' }}>
-                                    <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>Pro-Tip</Typography>
-                                    <Typography variant="body2">Analyzing performance across custom dates helps identify seasonal trends and the impact of promotional activities on your bottom line.</Typography>
-                                </Card>
-                            </Grid>
-                        </Grid>
+                                </Box>
+                                <IconButton onClick={() => setProfitExpanded(v => !v)} sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>
+                                    {profitExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                </IconButton>
+                            </Box>
+
+                            {/* ── 3 Stream Cards ── */}
+                            <Box sx={{ p: isMobile ? 1.5 : 2.5 }}>
+                                <Grid container spacing={isMobile ? 1 : 2}>
+                                    {profitBreakdown.streams.map((stream) => {
+                                        const pct = profitBreakdown.totalProfit > 0 ? (stream.profit / profitBreakdown.totalProfit * 100) : 0;
+                                        return (
+                                            <Grid item xs={12} sm={4} key={stream.label}>
+                                                <Box sx={{ p: isMobile ? 1.5 : 2, borderRadius: 2.5, border: `1.5px solid ${stream.color}33`, bgcolor: stream.color + '0d' }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                        <Typography sx={{ fontSize: isMobile ? '1rem' : '1.3rem' }}>{stream.icon}</Typography>
+                                                        <Chip label={`${pct.toFixed(1)}%`} size="small" sx={{ fontWeight: 900, height: 20, fontSize: '0.65rem', bgcolor: stream.color, color: '#fff' }} />
+                                                    </Box>
+                                                    <Typography sx={{ fontWeight: 800, fontSize: isMobile ? '0.65rem' : '0.75rem', color: stream.color, textTransform: 'uppercase', mb: 0.3 }}>{stream.label}</Typography>
+                                                    <Typography sx={{ fontWeight: 900, color: stream.color, fontSize: isMobile ? '1rem' : '1.25rem' }}>{stream.profit.toLocaleString()} <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{currency}</span></Typography>
+                                                    <Divider sx={{ my: 1 }} />
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption" color="text.secondary">Revenue</Typography>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700 }}>{stream.revenue.toLocaleString()}</Typography>
+                                                    </Box>
+                                                    {stream.label !== 'Workspace / Services' && (
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <Typography variant="caption" color="text.secondary">Cost (COGS)</Typography>
+                                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#c62828' }}>{stream.cost.toLocaleString()}</Typography>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            </Grid>
+                                        );
+                                    })}
+                                </Grid>
+                            </Box>
+
+                            {/* ── Expandable Per-Sale Table ── */}
+                            <Collapse in={profitExpanded}>
+                                <Divider />
+                                <Box sx={{ p: isMobile ? 1.5 : 2.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.5 }}>Per-Sale Profit Details</Typography>
+                                    <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                                        <Table size="small" sx={{ minWidth: isMobile ? 500 : 'auto' }}>
+                                            <TableHead>
+                                                <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.03)' }}>
+                                                    {['Date','Customer','Total','🛞 Tires','🔧 Parts','⚙️ Services','Net Profit'].map(h => (
+                                                        <TableCell key={h} sx={{ fontWeight: 900, fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{h}</TableCell>
+                                                    ))}
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {profitBreakdown.saleRows.map((row) => (
+                                                    <TableRow key={row.id} hover>
+                                                        <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{row.customer}</TableCell>
+                                                        <TableCell sx={{ fontSize: '0.75rem' }}>{row.total.toLocaleString()}</TableCell>
+                                                        <TableCell sx={{ fontSize: '0.75rem', color: '#1a237e', fontWeight: 700 }}>{row.tireProfit.toLocaleString()}</TableCell>
+                                                        <TableCell sx={{ fontSize: '0.75rem', color: '#6a1b9a', fontWeight: 700 }}>{row.partsProfit.toLocaleString()}</TableCell>
+                                                        <TableCell sx={{ fontSize: '0.75rem', color: '#00695c', fontWeight: 700 }}>{row.serviceProfit.toLocaleString()}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 900, fontSize: '0.8rem', color: row.profit >= 0 ? '#2e7d32' : '#c62828' }}>{row.profit.toLocaleString()}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                                {profitBreakdown.saleRows.length === 0 && (
+                                                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3 }}>No sales data found.</TableCell></TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </Box>
+                                </Box>
+                            </Collapse>
+                        </Card>
+
+                        {/* ── Payment Split ── */}
+                        <Card sx={{ borderRadius: 3, p: isMobile ? 2 : 3, border: '1px solid rgba(0,0,0,0.06)' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 2 }}>Payment Method Split</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                {pulseData.payments.map(p => (
+                                    <Box key={p.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2 }}>
+                                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>{p.name}</Typography>
+                                        <Typography sx={{ fontWeight: 900, color: 'primary.main' }}>{p.value.toLocaleString()} {currency}</Typography>
+                                    </Box>
+                                ))}
+                                {pulseData.payments.length === 0 && <Typography color="text.secondary" fontSize="0.85rem">No sales in this period.</Typography>}
+                            </Box>
+                        </Card>
                     </Box>
                 )}
 
