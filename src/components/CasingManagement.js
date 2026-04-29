@@ -176,7 +176,7 @@ function CasingManagement({ retreadJobs = [], suppliers = [], masterData = {}, a
         <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>Track casings from customer drop-off to supplier return and sale</Typography>
       </Box>
 
-      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="standard" sx={{ mb: 4 }}>
+      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant={isMobile ? "scrollable" : "standard"} scrollButtons={isMobile ? "auto" : false} sx={{ mb: 4 }}>
         <Tab icon={<InventoryIcon />} iconPosition="start" label="Dashboard" sx={{ fontWeight: 800 }} />
         <Tab icon={<ShippingIcon />} iconPosition="start" label="Job Tracker" sx={{ fontWeight: 800 }} />
       </Tabs>
@@ -226,14 +226,16 @@ function CasingManagement({ retreadJobs = [], suppliers = [], masterData = {}, a
                 <Button fullWidth={isMobile} variant="contained" startIcon={<AddIcon />} onClick={() => setIsAddDialogOpen(true)} sx={{ borderRadius: 3, fontWeight: 900 }}>RECEIVE CASING</Button>
             </Box>
             
-            <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-                <StyledDataGrid 
-                    rows={filteredJobs} 
-                    columns={columns} 
-                    autoHeight 
-                    disableSelectionOnClick
-                    components={{ Toolbar: GridToolbar }} 
-                />
+            <Card sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+                <Box sx={{ minWidth: isMobile ? 800 : '100%' }}>
+                  <StyledDataGrid 
+                      rows={filteredJobs} 
+                      columns={columns} 
+                      autoHeight 
+                      disableSelectionOnClick
+                      components={{ Toolbar: GridToolbar }} 
+                  />
+                </Box>
             </Card>
         </Box>
       )}
@@ -243,12 +245,12 @@ function CasingManagement({ retreadJobs = [], suppliers = [], masterData = {}, a
           <DialogTitle sx={{ fontWeight: 900 }}>Receive Casing from Customer</DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
               <MuiTextField fullWidth label="Customer Name" variant="outlined" value={newJob.customer_name} onChange={e => setNewJob({...newJob, customer_name: e.target.value})} />
-              <Grid container spacing={2}>
-                  <Grid item xs={6}><MuiTextField fullWidth label="Phone" variant="outlined" value={newJob.customer_phone} onChange={e => setNewJob({...newJob, customer_phone: e.target.value})} /></Grid>
-                  <Grid item xs={6}><MuiTextField fullWidth label="Vehicle Number" variant="outlined" value={newJob.vehicle_number} onChange={e => setNewJob({...newJob, vehicle_number: e.target.value})} /></Grid>
+              <Grid container spacing={isMobile ? 1 : 2}>
+                  <Grid item xs={12} sm={6}><MuiTextField fullWidth label="Phone" variant="outlined" value={newJob.customer_phone} onChange={e => setNewJob({...newJob, customer_phone: e.target.value})} /></Grid>
+                  <Grid item xs={12} sm={6}><MuiTextField fullWidth label="Vehicle Number" variant="outlined" value={newJob.vehicle_number} onChange={e => setNewJob({...newJob, vehicle_number: e.target.value})} /></Grid>
               </Grid>
-              <Grid container spacing={2}>
-                  <Grid item xs={4}>
+              <Grid container spacing={isMobile ? 1 : 2}>
+                  <Grid item xs={12} sm={4}>
                       <FormControl fullWidth variant="outlined">
                         <InputLabel>Brand</InputLabel>
                         <Select value={newJob.brand} onChange={e => setNewJob({...newJob, brand: e.target.value})} label="Brand">
@@ -256,8 +258,8 @@ function CasingManagement({ retreadJobs = [], suppliers = [], masterData = {}, a
                         </Select>
                       </FormControl>
                   </Grid>
-                  <Grid item xs={4}><MuiTextField fullWidth label="Size" variant="outlined" value={newJob.size} onChange={e => setNewJob({...newJob, size: e.target.value})} /></Grid>
-                  <Grid item xs={4}><MuiTextField fullWidth label="Serial Number" variant="outlined" value={newJob.serial_number} onChange={e => setNewJob({...newJob, serial_number: e.target.value})} /></Grid>
+                  <Grid item xs={12} sm={4}><MuiTextField fullWidth label="Size" variant="outlined" value={newJob.size} onChange={e => setNewJob({...newJob, size: e.target.value})} /></Grid>
+                  <Grid item xs={12} sm={4}><MuiTextField fullWidth label="Serial Number" variant="outlined" value={newJob.serial_number} onChange={e => setNewJob({...newJob, serial_number: e.target.value})} /></Grid>
               </Grid>
               <MuiTextField fullWidth label="Inspection Notes" multiline rows={2} variant="outlined" value={newJob.notes} onChange={e => setNewJob({...newJob, notes: e.target.value})} />
           </DialogContent>
