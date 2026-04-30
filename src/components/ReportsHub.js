@@ -21,9 +21,6 @@ import {
     Refresh as RefreshIcon,
     ExpandMore as ExpandMoreIcon,
     ExpandLess as ExpandLessIcon,
-    TireRepair as TireIcon,
-    Build as BuildIcon,
-    Settings as ServiceIcon,
     TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import { supabase } from '../supabaseClient';
@@ -42,7 +39,6 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
     const [loadingAudit, setLoadingAudit] = useState(false);
     const [alert, setAlert] = useState({ open: false, message: '', severity: 'info' });
     const [profitExpanded, setProfitExpanded] = useState(false);
-    const [expandedSaleId, setExpandedSaleId] = useState(null);
 
     const currency = businessProfile?.currency || 'LKR';
 

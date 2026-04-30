@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   TextField, Button, Grid, Typography, Box, IconButton,
-  Card, CardContent, Tabs, Tab, Chip, Avatar, useMediaQuery, useTheme,
+  Card, Tabs, Tab, Chip, useMediaQuery, useTheme,
   Select, MenuItem, InputLabel, FormControl, Paper, Divider
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -10,7 +10,6 @@ import {
     Add as AddIcon,
     Inventory as InventoryIcon,
     LocalShipping as ShippingIcon,
-    CheckCircle as CheckCircleIcon,
     Delete as DeleteIcon,
     Sync as SyncIcon
 } from '@mui/icons-material';
