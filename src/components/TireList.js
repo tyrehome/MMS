@@ -62,7 +62,6 @@ const TireList = ({
   const [isPOOpen,       setIsPOOpen]       = useState(false);
   const [poNotes,        setPoNotes]        = useState('');
   const [poSupplier,     setPoSupplier]     = useState('');
-  const [selectedItemClaims, setSelectedItemClaims] = useState(null); // { name, claims }
 
   /* â”€â”€ Lot aging data from DB â”€â”€ */
   const [lotAging, setLotAging] = useState([]); // from v_stock_aging view
@@ -967,8 +966,7 @@ const TireList = ({
                                 label={itemClaims.length} 
                                 size="small" 
                                 color="error" 
-                                onClick={() => setSelectedItemClaims({ name: item.name, claims: itemClaims })}
-                                sx={{ fontWeight: 900, cursor: 'pointer' }} 
+                                sx={{ fontWeight: 900 }} 
                               />
                             );
                           })()}

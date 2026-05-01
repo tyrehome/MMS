@@ -160,14 +160,12 @@ function ComplaintManagement({ complaints = [], customers = [], sales = [], supp
       const savedComplaint = result.data[0];
 
       // AUTOMATIC STOCK ADJUSTMENT FOR REPLACEMENTS
-      // If status changed to Resolved/Closed AND replacement_given is true AND stock wasn't deducted yet
       if ((cleanData.status === 'Resolved' || cleanData.status === 'Closed') && 
           cleanData.replacement_given && 
           (!selectedComplaint || !selectedComplaint.replacement_given)) {
         
         if (cleanData.item_id && cleanData.item_type) {
-           const table = cleanData.item_type === 'tire' ? 'tires' : 'parts';
-           // Decrement stock by 1 for the replacement
+            // Decrement stock by 1 for the replacement
            const { error: stockErr } = await supabase.rpc('adjust_stock', { 
              p_item_id: cleanData.item_id, 
              p_item_type: cleanData.item_type, 
@@ -234,7 +232,6 @@ function ComplaintManagement({ complaints = [], customers = [], sales = [], supp
       </Box>
     )},
     { field: 'subject', headerName: 'SUBJECT', flex: 1.5, minWidth: 200, renderCell: (p) => {
-      const linkedItem = p.row.item_type === 'tire' ? (sales || []).flatMap(s => s.items || []).find(i => i && i.tire_id === p.row.item_id) : null;
       return (
         <Box>
           <Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.value}</Typography>
@@ -734,7 +731,7 @@ function ComplaintManagement({ complaints = [], customers = [], sales = [], supp
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
-                          <Button size="small" variant="contained" onClick={handleSave} disabled={!newLogText.trim()} sx={{ borderRadius: 2, fontWeight: 800 }}>Post</Button>
+                          <Button size="small" variant="contained" onClick={handleAddLog} disabled={!newLogText.trim()} sx={{ borderRadius: 2, fontWeight: 800 }}>Post</Button>
                         </InputAdornment>
                       )
                     }}

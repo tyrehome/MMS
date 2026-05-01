@@ -29,7 +29,6 @@ import { Snackbar, Alert } from '@mui/material';
 
 const ReportsHub = ({ complaints = [], tires = [], sales = [], accounts = [], invoices = [], parts = [], businessProfile, recordAudit }) => {
     const { isAdmin } = useAuth();
-    const theme = useTheme();
     const isMobile = useMediaQuery('(max-width:768px)');
     const [tabValue, setTabValue] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
@@ -457,9 +456,9 @@ const ReportsHub = ({ complaints = [], tires = [], sales = [], accounts = [], in
                                     <Card sx={{ borderRadius: 3, bgcolor: s.bg, border: `1px solid ${s.color}22`, p: isMobile ? 2 : 1.5, height: '100%' }}>
                                         <Typography variant="caption" sx={{ fontWeight: 800, color: s.color, opacity: 0.8, display: 'block', textTransform: 'uppercase', fontSize: isMobile ? '0.55rem' : '0.7rem' }}>{s.label}</Typography>
                                         <Typography sx={{ fontWeight: 900, color: s.color, fontSize: isMobile ? '1.1rem' : '1.6rem', lineHeight: 1.2, mt: 0.5 }}>
-                                            {s.isCount ? s.value : s.value.toLocaleString()}
+                                            {s.value.toLocaleString()}
                                         </Typography>
-                                        {!s.isCount && <Typography variant="caption" sx={{ color: s.color, opacity: 0.7, fontWeight: 700 }}>{currency}</Typography>}
+                                        <Typography variant="caption" sx={{ color: s.color, opacity: 0.7, fontWeight: 700 }}>{currency}</Typography>
                                     </Card>
                                 </Grid>
                             ))}
