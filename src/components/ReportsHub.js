@@ -3,7 +3,7 @@ import {
     Typography, Box, Tab, Tabs, Grid, Card, CardContent, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
     Chip, TextField, Button, useMediaQuery, LinearProgress,
-    Collapse, IconButton, Divider
+    Collapse, IconButton, Divider, useTheme
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer
@@ -27,9 +27,10 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { Snackbar, Alert } from '@mui/material';
 
-const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], parts = [], businessProfile, recordAudit }) => {
+const ReportsHub = ({ complaints = [], tires = [], sales = [], accounts = [], invoices = [], parts = [], businessProfile, recordAudit }) => {
     const { isAdmin } = useAuth();
-    const isMobile = useMediaQuery('(max-width:600px)');
+    const theme = useTheme();
+    const isMobile = useMediaQuery('(max-width:768px)');
     const [tabValue, setTabValue] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDate, setFilterDate] = useState('');
@@ -94,7 +95,17 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
     // Analytics Logic
     const pandLData = useMemo(() => {
         let revenue = 0; let cogs = 0;
-        sales.forEach(sale => {
+        const filteredSales = sales.filter(s => {
+            const saleDate = (s.created_at || '').split('T')[0];
+            return saleDate >= startDate && saleDate <= endDate;
+        });
+
+        const filteredComplaints = complaints.filter(c => {
+            const cDate = (c.created_at || '').split('T')[0];
+            return cDate >= startDate && cDate <= endDate;
+        });
+
+        filteredSales.forEach(sale => {
             (sale.sale_items || []).forEach(item => {
                 revenue += (parseFloat(item.price || 0) * parseInt(item.quantity || 0));
                 if (item.tire_id) {
@@ -106,8 +117,9 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                 }
             });
         });
-        return { revenue, cogs, grossProfit: revenue - cogs };
-    }, [sales, tires, parts]);
+        const totalClaimLoss = filteredComplaints.reduce((sum, c) => sum + Number(c.shop_contribution || 0), 0);
+        return { revenue, cogs, grossProfit: revenue - cogs - totalClaimLoss, totalClaimLoss, filteredComplaints };
+    }, [sales, tires, parts, complaints, startDate, endDate]);
 
     // Profit Breakdown by stream (Tires / Parts / Services) — filtered by date range
     const profitBreakdown = useMemo(() => {
@@ -178,7 +190,12 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
 
     const movingData = useMemo(() => {
         const counts = {};
-        sales.forEach(sale => {
+        const filtered = sales.filter(s => {
+            const saleDate = (s.created_at || '').split('T')[0];
+            return saleDate >= startDate && saleDate <= endDate;
+        });
+
+        filtered.forEach(sale => {
             (sale.sale_items || []).forEach(item => {
                 if (item.tire_id) {
                     const tire = tires.find(t => t.id === item.tire_id);
@@ -186,11 +203,17 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                         const key = `${tire.brand} ${tire.size}`;
                         counts[key] = (counts[key] || 0) + parseInt(item.quantity || 0);
                     }
+                } else if (item.part_id) {
+                    const part = (parts || []).find(p => p.id === item.part_id);
+                    if (part) {
+                        const key = part.name;
+                        counts[key] = (counts[key] || 0) + parseInt(item.quantity || 0);
+                    }
                 }
             });
         });
         return Object.entries(counts).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
-    }, [sales, tires]);
+    }, [sales, tires, parts, startDate, endDate]);
 
     const filteredSales = useMemo(() => {
         return sales
@@ -396,42 +419,42 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
             </Tabs>
 
             <Box id="report-content">
+                {/* ── Global Period Filter Bar ── */}
+                <Box sx={{ mb: 3, p: isMobile ? 2 : 3, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalendarIcon color="action" fontSize="small" />
+                        <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Period:</Typography>
+                    </Box>
+                    <TextField size="small" type="date" label="From" value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
+                    <TextField size="small" type="date" label="To" value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {[['Today', 0], ['Yesterday', 1], ['7 Days', 7], ['30 Days', 30]].map(([lbl, days]) => (
+                            <Button key={lbl} size="small" variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
+                                onClick={() => {
+                                    const end = new Date(); const start = new Date();
+                                    start.setDate(start.getDate() - days);
+                                    setEndDate(end.toISOString().split('T')[0]);
+                                    setStartDate(start.toISOString().split('T')[0]);
+                                }}>{lbl}</Button>
+                        ))}
+                    </Box>
+                </Box>
                 {tabValue === 0 && (
                     <Box>
-                        {/* ── Date Filter Bar ── */}
-                        <Box sx={{ mb: 3, p: isMobile ? 2 : 3, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <CalendarIcon color="action" fontSize="small" />
-                                <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Period:</Typography>
-                            </Box>
-                            <TextField size="small" type="date" label="From" value={startDate}
-                                onChange={e => setStartDate(e.target.value)}
-                                InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
-                            <TextField size="small" type="date" label="To" value={endDate}
-                                onChange={e => setEndDate(e.target.value)}
-                                InputLabelProps={{ shrink: true }} sx={{ width: isMobile ? '100%' : 145 }} />
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                {[['Today', 0], ['Yesterday', 1], ['7 Days', 7]].map(([lbl, days]) => (
-                                    <Button key={lbl} size="small" variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
-                                        onClick={() => {
-                                            const end = new Date(); const start = new Date();
-                                            start.setDate(start.getDate() - days);
-                                            setEndDate(end.toISOString().split('T')[0]);
-                                            setStartDate(start.toISOString().split('T')[0]);
-                                        }}>{lbl}</Button>
-                                ))}
-                            </Box>
-                        </Box>
 
                         {/* ── KPI Cards ── */}
-                        <Grid container spacing={isMobile ? 1.5 : 3} sx={{ mb: 3 }}>
+                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mb: 3 }}>
                             {[
                                 { label: 'Total Revenue', value: pulseData.revenue, color: '#2e7d32', bg: '#f1f8e9' },
-                                { label: 'Total Profit',  value: pulseData.profit,  color: '#1a237e', bg: '#e8eaf6' },
-                                { label: 'Sales Count',   value: pulseData.count,   color: '#6a1b9a', bg: '#f3e5f5', isCount: true },
+                                { label: 'Net Profit',  value: pulseData.profit - pandLData.totalClaimLoss,  color: '#1a237e', bg: '#e8eaf6' },
+                                { label: 'Warranty Loss',   value: pandLData.totalClaimLoss,   color: '#d32f2f', bg: '#ffebee' },
                             ].map((s, i) => (
-                                <Grid item xs={4} key={i}>
-                                    <Card sx={{ borderRadius: 3, bgcolor: s.bg, border: `1px solid ${s.color}22`, p: isMobile ? 1 : 1.5, height: '100%' }}>
+                                <Grid item xs={12} sm={4} key={i}>
+                                    <Card sx={{ borderRadius: 3, bgcolor: s.bg, border: `1px solid ${s.color}22`, p: isMobile ? 2 : 1.5, height: '100%' }}>
                                         <Typography variant="caption" sx={{ fontWeight: 800, color: s.color, opacity: 0.8, display: 'block', textTransform: 'uppercase', fontSize: isMobile ? '0.55rem' : '0.7rem' }}>{s.label}</Typography>
                                         <Typography sx={{ fontWeight: 900, color: s.color, fontSize: isMobile ? '1.1rem' : '1.6rem', lineHeight: 1.2, mt: 0.5 }}>
                                             {s.isCount ? s.value : s.value.toLocaleString()}
@@ -509,7 +532,7 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                                             <TableBody>
                                                 {profitBreakdown.saleRows.map((row) => (
                                                     <TableRow key={row.id} hover>
-                                                        <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</TableCell>
+                                                        <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</TableCell>
                                                         <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{row.customer}</TableCell>
                                                         <TableCell sx={{ fontSize: '0.75rem' }}>{row.total.toLocaleString()}</TableCell>
                                                         <TableCell sx={{ fontSize: '0.75rem', color: '#1a237e', fontWeight: 700 }}>{row.tireProfit.toLocaleString()}</TableCell>
@@ -526,6 +549,32 @@ const ReportsHub = ({ tires = [], sales = [], accounts = [], invoices = [], part
                                     </Box>
                                 </Box>
                             </Collapse>
+                        </Card>
+
+                        {/* ── Warranty & Claims Audit ── */}
+                        <Card sx={{ borderRadius: 3, p: isMobile ? 2 : 3, border: '1px solid rgba(0,0,0,0.06)', mb: 3, bgcolor: '#fafafa' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Claims & Warranty Audit</Typography>
+                                <Chip label={`${pandLData.filteredComplaints.length} in period`} size="small" sx={{ fontWeight: 900 }} />
+                            </Box>
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>PENDING RESOLUTION</Typography>
+                                        <Typography variant="h6" sx={{ fontWeight: 900, color: 'warning.main' }}>
+                                            {pandLData.filteredComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid rgba(0,0,0,0.05)' }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>PERIOD SHOP LOSS</Typography>
+                                        <Typography variant="h6" sx={{ fontWeight: 900, color: 'error.main' }}>
+                                            {pandLData.totalClaimLoss.toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            </Grid>
                         </Card>
 
                         {/* ── Payment Split ── */}

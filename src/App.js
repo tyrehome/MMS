@@ -53,7 +53,9 @@ import CustomerProfile from "./components/CustomerProfile";
 import WorkerTracking from "./components/WorkerTracking";
 import SupplierManagement from "./components/SupplierManagement";
 import CasingManagement from "./components/CasingManagement";
+import ComplaintManagement from "./components/ComplaintManagement";
 import SyncIcon from "@mui/icons-material/Sync";
+import FeedbackIcon from "@mui/icons-material/Feedback";
 
 const SupplierIcon = LocalShippingIcon;
 const drawerWidth = 240;
@@ -139,6 +141,7 @@ const AppContent = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [inventoryLots, setInventoryLots] = useState([]);
   const [retreadJobs, setRetreadJobs] = useState([]);
+  const [complaints, setComplaints] = useState([]);
   const [selectedComponent, setSelectedComponent] = useState(isAdmin ? "Dashboard" : "SaleForm");
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -211,6 +214,7 @@ const AppContent = () => {
       fetchData('suppliers', setSuppliers);
       fetchData('inventory_lots', setInventoryLots);
       fetchData('retread_jobs', setRetreadJobs);
+      fetchData('complaints', setComplaints);
     }, 500);
 
     // --- REAL-TIME SUBSCRIPTIONS ---
@@ -231,7 +235,7 @@ const AppContent = () => {
             appointments: setAppointments, invoices: setInvoices,
             workers: setWorkers, tasks: setTasks, vehicles: setVehicles, 
             suppliers: setSuppliers, inventory_lots: setInventoryLots,
-            retread_jobs: setRetreadJobs
+            retread_jobs: setRetreadJobs, complaints: setComplaints
           };
           if (tableMap[table]) {
             fetchData(table, tableMap[table]);
@@ -533,6 +537,7 @@ const AppContent = () => {
     { text: "Retreads & Casing", icon: <SyncIcon />, component: "CasingManagement" },
     { text: "Vendors & GRN", icon: <SupplierIcon />, component: "Suppliers", adminOnly: true },
     { text: "Finance Hub", icon: <AccountBalanceWalletIcon />, component: "Finance", adminOnly: true },
+    { text: "Complaints & Claims", icon: <FeedbackIcon />, component: "Complaints" },
     { text: "360 Reports", icon: <AssessmentIcon />, component: "Reports", adminOnly: true },
     { text: "Settings", icon: <SettingsIcon />, component: "Settings", adminOnly: true },
   ];
@@ -608,8 +613,8 @@ const AppContent = () => {
     </div>
   );
   const renderComponent = () => {
-    const commonProps = { businessProfile, masterData, suppliers, parts, recordAudit, isAdmin };
-    const posComponent = <SaleForm parts={parts || []} tires={tires || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} retreadJobs={retreadJobs || []} {...commonProps} />;
+    const commonProps = { businessProfile, masterData, suppliers, parts, recordAudit, isAdmin, complaints };
+    const posComponent = <SaleForm parts={parts || []} tires={tires || []} sales={sales || []} addSale={addSale} saveQuotation={saveQuotation} accounts={accounts || []} workers={workers || []} billingDraft={billingDraft} setBillingDraft={setBillingDraft} retreadJobs={retreadJobs || []} {...commonProps} />;
 
     switch (selectedComponent) {
       case "Dashboard": 
@@ -657,13 +662,16 @@ const AppContent = () => {
         return isAdmin ? <FinanceHub accounts={accounts || []} invoices={invoices || []} suppliers={suppliers || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
       
       case "Reports": 
-        return isAdmin ? <ReportsHub tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
+        return isAdmin ? <ReportsHub complaints={complaints || []} tires={tires || []} sales={sales || []} accounts={accounts || []} invoices={invoices || []} recordAudit={recordAudit} {...commonProps} /> : posComponent;
       
       case "Suppliers":
         return isAdmin ? <SupplierManagement suppliers={suppliers || []} updateSupplier={updateSupplier} deleteSupplier={deleteSupplier} {...commonProps} /> : posComponent;
 
       case "CasingManagement":
         return <CasingManagement retreadJobs={retreadJobs || []} suppliers={suppliers || []} addRetreadJob={addRetreadJob} updateRetreadJob={updateRetreadJob} deleteRetreadJob={deleteRetreadJob} {...commonProps} />;
+
+      case "Complaints":
+        return <ComplaintManagement complaints={complaints || []} customers={customers || []} sales={sales || []} tires={tires || []} parts={parts || []} {...commonProps} />;
 
       case "Settings": 
         return isAdmin ? <Settings {...commonProps} /> : posComponent;

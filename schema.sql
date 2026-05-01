@@ -1065,3 +1065,68 @@ CREATE TABLE IF NOT EXISTS public.retread_jobs (
 );
 ALTER TABLE public.retread_jobs REPLICA IDENTITY FULL;
 
+-- ==========================================
+-- COMPLAINT MANAGEMENT & WARRANTY CLAIMS
+-- This module tracks customer feedback, service issues, and 
+-- supplier warranty claims. It integrates with Sales and 
+-- Inventory Hub for product linking and financial audits.
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.complaints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name TEXT,
+    customer_phone TEXT,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    sale_id UUID REFERENCES public.sales(id) ON DELETE SET NULL,
+    subject TEXT NOT NULL,
+    description TEXT,
+    category TEXT DEFAULT 'Service', -- 'Product', 'Service', 'Billing', 'Warranty', 'Other'
+    priority TEXT DEFAULT 'Medium', -- 'Low', 'Medium', 'High', 'Critical'
+    status TEXT DEFAULT 'Open', -- 'Open', 'In Progress', 'Resolved', 'Closed'
+    assigned_worker_id UUID REFERENCES public.workers(id) ON DELETE SET NULL,
+    item_id UUID, -- Links to specific product (tire/part) in inventory
+    item_type TEXT, -- Classification of linked item ('tire' or 'part')
+    
+    -- Financial/Claim Details
+    is_warranty_claim BOOLEAN DEFAULT false,
+    supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+    claim_amount NUMERIC DEFAULT 0, -- Original value of the claimed item/service
+    customer_refund_amount NUMERIC DEFAULT 0, -- Amount actually paid/credited to the customer
+    supplier_contribution NUMERIC DEFAULT 0, -- Amount recovered from the supplier (credit/cash)
+    shop_contribution NUMERIC DEFAULT 0, -- Net loss incurred by the shop (Refund to Customer - Supplier Recovery)
+    replacement_item_id UUID, -- Link to tires/parts if a replacement was given
+    replacement_given BOOLEAN DEFAULT false, -- True if a brand new replacement was provided to the customer
+    replacement_item_details TEXT, -- Specifics of the replacement (Serial, Brand, etc.)
+    resolution_notes TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.complaint_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    complaint_id UUID REFERENCES public.complaints(id) ON DELETE CASCADE,
+    update_text TEXT NOT NULL,
+    author_id UUID REFERENCES public.profiles(id),
+    status_change TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_customer ON public.complaints(customer_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_sale ON public.complaints(sale_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaint_logs_complaint ON public.complaint_logs(complaint_id);
+
+ALTER TABLE public.complaints REPLICA IDENTITY FULL;
+ALTER TABLE public.complaint_logs REPLICA IDENTITY FULL;
+
+-- Ensure added to publication
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'complaints') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.complaints;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'complaint_logs') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.complaint_logs;
+    END IF;
+END $$;
+

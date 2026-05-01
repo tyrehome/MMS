@@ -4,7 +4,7 @@ import {
   FormControl, Box, Table, TableBody, TableCell,
   TableRow, IconButton, Divider,
   Checkbox, FormControlLabel, Card, CardContent, Chip, Tooltip, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, Badge, Avatar, useMediaQuery
+  Dialog, DialogTitle, DialogContent, DialogActions, Badge, Avatar, useMediaQuery, InputLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -61,7 +61,7 @@ const ReceiptStyles = `
   .receipt-container .dev-credit { font-size: 7px; opacity: 0.6; margin-top: 6px; text-align: center; }
 `;
 
-const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft, retreadJobs = [] }) => {
+const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, businessProfile, accounts = [], workers = [], billingDraft, setBillingDraft, retreadJobs = [], sales = [] }) => {
   const { t, receiptLang, toggleReceiptLang } = useLanguage();
   const { isAdmin } = useAuth();
   const isMobile = useMediaQuery('(max-width:600px)');
@@ -118,6 +118,10 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
   const [saveStatus, setSaveStatus] = useState('');
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [lastSavedInvoice, setLastSavedInvoice] = useState(null);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isReportIssueDialogOpen, setIsReportIssueDialogOpen] = useState(false);
+  const [reportingSale, setReportingSale] = useState(null);
+  const [complaintData, setComplaintData] = useState({ subject: '', description: '', priority: 'Medium', item_id: '', item_type: '' });
 
   // Billing Draft Consumption
   useEffect(() => {
@@ -337,6 +341,30 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
     setIsSubmitting(false);
   };
 
+  const handleReportIssue = async () => {
+    if (!complaintData.subject) return alert("Subject required.");
+    try {
+      const { error } = await supabase.from('complaints').insert([{
+        customer_name: reportingSale.customer_name || 'Walk-in',
+        customer_phone: reportingSale.customer_phone || '',
+        sale_id: reportingSale.id,
+        subject: complaintData.subject,
+        description: complaintData.description,
+        priority: complaintData.priority,
+        item_id: complaintData.item_id || null,
+        item_type: complaintData.item_type || null,
+        category: 'Product', // Default for sales issues
+        status: 'Open'
+      }]);
+      if (error) throw error;
+      alert("Issue reported successfully. Admin will review it in the Complaints tab.");
+      setIsReportIssueDialogOpen(false);
+      setComplaintData({ subject: '', description: '', priority: 'Medium' });
+    } catch (err) {
+      alert("Failed to report issue: " + err.message);
+    }
+  };
+
   const handleThermalPrint = () => {
     const printWindow = window.open('', '_blank');
     const receiptHtml = document.getElementById('thermal-receipt-preview').innerHTML;
@@ -370,7 +398,7 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
           {saveStatus && <Alert severity="info" sx={{ py: 0, px: 2, borderRadius: 2, display: {xs: 'none', md: 'flex'} }}>{saveStatus}</Alert>}
           <IconButton color="primary" onClick={() => window.location.reload()} title="Reload Application" size="small"><RefreshIcon /></IconButton>
           <Button variant="outlined" size="small" onClick={handleLoadDraft} disabled={!localStorage.getItem('pos_draft_invoice')} sx={{ borderRadius: 3, px: 2, fontSize: '0.75rem' }}>Restore</Button>
-          <Button variant="outlined" size="small" startIcon={<AnalyticsIcon />} sx={{ borderRadius: 3, px: 2, fontSize: '0.75rem' }}>History</Button>
+          <Button variant="outlined" size="small" startIcon={<AnalyticsIcon />} onClick={() => setIsHistoryDialogOpen(true)} sx={{ borderRadius: 3, px: 2, fontSize: '0.75rem' }}>History</Button>
         </Box>
       </Box>
 
@@ -1215,6 +1243,91 @@ const SaleForm = ({ tires, parts = [], addSale, saveQuotation, masterData, busin
         <DialogActions sx={{ p: {xs: 2, md: 3}, borderTop: '1px solid #eee' }}>
           <Button onClick={() => setIsPrintDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>Close</Button>
           <Button onClick={handleThermalPrint} variant="contained" startIcon={<PrintIcon />} sx={{ borderRadius: 2, px: 4 }}>Print Receipt</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- SALE HISTORY DIALOG --- */}
+      <Dialog open={isHistoryDialogOpen} onClose={() => setIsHistoryDialogOpen(false)} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Recent Transactions
+          <IconButton onClick={() => setIsHistoryDialogOpen(false)} size="small"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <Table size="small">
+            <TableBody>
+              {sales.slice().reverse().slice(0, 10).map(s => (
+                <TableRow key={s.id}>
+                  <TableCell sx={{ py: 2, px: 3 }}>
+                    <Typography sx={{ fontWeight: 800 }}>{s.customer_name || 'Walk-in'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{new Date(s.created_at).toLocaleString()}</Typography>
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 900 }}>{Number(s.total).toLocaleString()} {currency}</TableCell>
+                  <TableCell align="right" sx={{ px: 3 }}>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      color="error" 
+                      onClick={() => { setReportingSale(s); setIsReportIssueDialogOpen(true); }}
+                      sx={{ borderRadius: 2, fontWeight: 800, fontSize: '0.7rem' }}
+                    >
+                      REPORT ISSUE
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- REPORT ISSUE DIALOG --- */}
+      <Dialog open={isReportIssueDialogOpen} onClose={() => setIsReportIssueDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Report Issue: {reportingSale?.customer_name || 'Walk-in'}</DialogTitle>
+        <DialogContent sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography variant="caption" color="text.secondary">This will create a new complaint record linked to Invoice #{reportingSale?.id.substring(0, 8)}</Typography>
+          <Grid container spacing={0}>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel>Problematic Item (Optional)</InputLabel>
+                <Select
+                  label="Problematic Item (Optional)"
+                  value={complaintData.item_id}
+                  onChange={e => {
+                    const item = reportingSale.sale_items?.find(i => i.id === e.target.value);
+                    setComplaintData({
+                      ...complaintData,
+                      item_id: e.target.value,
+                      item_type: item?.tire_id ? 'tire' : 'part'
+                    });
+                  }}
+                >
+                  <MenuItem value="">None / General Issue</MenuItem>
+                  {reportingSale?.sale_items?.map(item => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.tire_id ? `Tire: ${tires.find(t => t.id === item.tire_id)?.brand} ${tires.find(t => t.id === item.tire_id)?.size}` : `Part: ${item.service_name}`}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="Issue Subject" size="small" value={complaintData.subject} onChange={e => setComplaintData({...complaintData, subject: e.target.value})} sx={{ mb: 2 }} />
+            </Grid>
+          </Grid>
+          <TextField fullWidth multiline rows={3} label="Details" size="small" value={complaintData.description} onChange={e => setComplaintData({...complaintData, description: e.target.value})} />
+          <FormControl fullWidth size="small">
+            <InputLabel>Priority</InputLabel>
+            <Select label="Priority" value={complaintData.priority} onChange={e => setComplaintData({...complaintData, priority: e.target.value})}>
+              <MenuItem value="Low">Low</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
+              <MenuItem value="High">High</MenuItem>
+              <MenuItem value="Critical">Critical</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setIsReportIssueDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleReportIssue} sx={{ borderRadius: 2, fontWeight: 900 }}>SUBMIT REPORT</Button>
         </DialogActions>
       </Dialog>
     </Box>

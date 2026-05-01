@@ -33,7 +33,15 @@ export const translations = {
     cashGiven: "CASH GIVEN",
     balance: "BALANCE",
     savings: "YOU SAVED:",
-    cashier: "CASHIER:"
+    cashier: "CASHIER:",
+    complaints: "Complaints",
+    warrantyClaims: "Warranty Claims",
+    reportIssue: "Report Issue",
+    claimStatus: "Claim Status",
+    supplierContribution: "Supplier Pay",
+    shopContribution: "Shop Loss",
+    resolution: "Resolution",
+    lossProfit: "Loss vs Profit"
   },
   si: {
     receiptPreview: "බිල්පත් පෙරදසුන",
@@ -68,6 +76,14 @@ export const translations = {
     cashGiven: "ලැබුණු මුදල",
     balance: "ඉතිරි මුදල",
     savings: "ඔබ ලබන වාසිය:",
-    cashier: "මුදල් අයකැමි:"
+    cashier: "මුදල් අයකැමි:",
+    complaints: "පැමිණිලි",
+    warrantyClaims: "වගකීම් හිමිකම්",
+    reportIssue: "ගැටලුවක් වාර්තා කරන්න",
+    claimStatus: "හිමිකම් තත්ත්වය",
+    supplierContribution: "සැපයුම්කරු ගෙවීම",
+    shopContribution: "ව්‍යාපාරයේ අලාභය",
+    resolution: "විසඳුම",
+    lossProfit: "අලාභය සහ ලාභය"
   }
 };

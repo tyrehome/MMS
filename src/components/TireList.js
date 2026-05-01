@@ -42,7 +42,7 @@ const TireList = ({
   tires = [], parts = [], hotelTires = [],
   addTire, updateTire, deleteTire,
   masterData, businessProfile, suppliers = [], recordAudit,
-  addBulkGRN, processStockReturn
+  addBulkGRN, processStockReturn, complaints = []
 }) => {
   const { isAdmin } = useAuth();
   const isMobile = useMediaQuery('(max-width:600px)');
@@ -62,6 +62,7 @@ const TireList = ({
   const [isPOOpen,       setIsPOOpen]       = useState(false);
   const [poNotes,        setPoNotes]        = useState('');
   const [poSupplier,     setPoSupplier]     = useState('');
+  const [selectedItemClaims, setSelectedItemClaims] = useState(null); // { name, claims }
 
   /* â”€â”€ Lot aging data from DB â”€â”€ */
   const [lotAging, setLotAging] = useState([]); // from v_stock_aging view
@@ -802,6 +803,7 @@ const TireList = ({
                     <TableCell sx={{ fontWeight: 900 }}>OLDEST BATCH AGE</TableCell>
                     {isAdmin && <TableCell align="right" sx={{ fontWeight: 900 }}>SELL PRICE</TableCell>}
                     {isAdmin && <TableCell align="right" sx={{ fontWeight: 900 }}>MARGIN</TableCell>}
+                    <TableCell align="center" sx={{ fontWeight: 900 }}>CLAIMS</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 900 }}>ORDER</TableCell>
                   </TableRow>
                 </TableHead>
@@ -955,6 +957,22 @@ const TireList = ({
                             ) : <Typography variant="caption" color="text.disabled">-</Typography>}
                           </TableCell>
                         )}
+
+                        <TableCell align="center">
+                          {(() => {
+                            const itemClaims = complaints.filter(c => c.item_id === item.id);
+                            if (itemClaims.length === 0) return <Typography variant="caption" color="text.disabled">0</Typography>;
+                            return (
+                              <Chip 
+                                label={itemClaims.length} 
+                                size="small" 
+                                color="error" 
+                                onClick={() => setSelectedItemClaims({ name: item.name, claims: itemClaims })}
+                                sx={{ fontWeight: 900, cursor: 'pointer' }} 
+                              />
+                            );
+                          })()}
+                        </TableCell>
 
                         <TableCell align="center">
                           <Tooltip title={inOrder ? 'Remove from order' : 'Add to purchase order'}>
