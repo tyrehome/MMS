@@ -332,10 +332,10 @@ const ReportsHub = ({ complaints = [], tires = [], sales = [], accounts = [], in
                 .card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; flex: 1; }
                 .card-title { font-size: 0.8rem; text-transform: uppercase; color: #666; margin-bottom: 5px; }
                 .card-value { font-size: 1.5rem; font-weight: bold; color: #1a237e; }
-                svg { max-width: 24px; max-height: 24px; display: inline-block; vertical-align: middle; }
+                svg { width: 24px !important; height: 24px !important; max-width: 24px !important; max-height: 24px !important; display: inline-block !important; vertical-align: middle !important; }
                 @media print {
-                    button { display: none; }
-                    svg { max-width: 24px; max-height: 24px; }
+                    button { display: none !important; }
+                    svg { width: 24px !important; height: 24px !important; max-width: 24px !important; max-height: 24px !important; }
                 }
             </style>
         `);
