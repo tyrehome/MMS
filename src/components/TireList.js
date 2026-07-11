@@ -447,12 +447,12 @@ const TireList = ({
 
     const rows = orderItems.map(item => `
       <tr>
-        <td style="padding:10px 8px;border-bottom:1px solid #eee;">
+        <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;">
           <strong>${item.name}</strong><br/>
-          <span style="font-size:11px;color:#666;">${item.label} • ${item.type.toUpperCase()}</span>
+          <span style="font-size:9px;color:#666;">${item.label} • ${item.type.toUpperCase()}</span>
         </td>
-        <td style="padding:10px 8px;border-bottom:1px solid #eee;text-align:center;">${item.currentStock}</td>
-        <td style="padding:10px 8px;border-bottom:1px solid #eee;text-align:center;font-weight:900;color:#1a237e;">${item.orderQty}</td>
+        <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:center;font-size:10px;">${item.currentStock}</td>
+        <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:center;font-weight:900;color:#1a237e;font-size:10px;">${item.orderQty}</td>
       </tr>
     `).join('');
 
@@ -461,27 +461,28 @@ const TireList = ({
       <head>
         <title>Purchase Order - ${poNumber}</title>
         <style>
-          @page { size: A4; margin: 20mm; }
-          * { margin:0;padding:0;box-sizing:border-box; }
-          body { font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1e293b; }
-          .header { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1a237e; }
-          .business { font-size:22px;font-weight:900;color:#1a237e; }
-          .po-label { font-size:28px;font-weight:900;color:#f50057; }
-          .po-number { font-size:13px;color:#666;margin-top:4px; }
-          .meta { display:flex;gap:40px;margin-bottom:28px;padding:16px;background:#f8fafd;border-radius:8px; }
-          .meta-block label { font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:4px; }
-          .meta-block span  { font-weight:700;font-size:14px; }
-          table { width:100%;border-collapse:collapse;margin-bottom:24px; }
+          @page { size: A4; margin: 10mm; }
+          * { margin:0;padding:0;box-sizing:border-box; line-height: 1.2; }
+          body { font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#1e293b; }
+          .header { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid #1a237e; }
+          .business { font-size:16px;font-weight:900;color:#1a237e; }
+          .po-label { font-size:18px;font-weight:900;color:#f50057; }
+          .po-number { font-size:10px;color:#666;margin-top:2px; }
+          .meta { display:flex;gap:15px;margin-bottom:10px;padding:8px;background:#f8fafd;border-radius:4px; }
+          .meta-block label { font-size:8px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:2px; }
+          .meta-block span  { font-weight:700;font-size:11px; }
+          table { width:100%;border-collapse:collapse;margin-bottom:10px; }
           thead { background:#1a237e;color:#fff; }
-          thead th { padding:12px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px; }
-          .totals { text-align:right;font-size:14px;margin-bottom:24px; }
-          .totals strong { font-size:16px;color:#1a237e; }
-          .notes-box { border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:24px; }
-          .notes-box label { font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px; }
-          .footer { text-align:center;font-size:11px;color:#94a3b8;border-top:1px dashed #e2e8f0;padding-top:16px; }
-          .badge { display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700; }
+          thead th { padding:4px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.5px; }
+          .totals { text-align:right;font-size:11px;margin-bottom:10px; }
+          .totals strong { font-size:12px;color:#1a237e; }
+          .notes-box { border:1px solid #e2e8f0;border-radius:4px;padding:8px;margin-bottom:10px; }
+          .notes-box label { font-size:8px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:2px; }
+          .footer { text-align:center;font-size:9px;color:#94a3b8;border-top:1px dashed #e2e8f0;padding-top:8px; }
+          .badge { display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700; }
           .badge-tire { background:#e8eaf6;color:#1a237e; }
           .badge-part { background:#fce4ec;color:#c2185b; }
+          svg { width: 16px !important; height: 16px !important; display: inline-block !important; vertical-align: middle !important; }
         </style>
       </head>
       <body>
