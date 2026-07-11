@@ -322,20 +322,30 @@ const ReportsHub = ({ complaints = [], tires = [], sales = [], accounts = [], in
         printWindow.document.write(`<html><head><title>${currentTabTitle}</title>`);
         printWindow.document.write(`
             <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
-                h1 { color: #1a237e; border-bottom: 2px solid #1a237e; padding-bottom: 10px; }
-                .meta { margin-bottom: 30px; font-size: 0.9rem; color: #666; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #e0e0e0; padding: 12px; text-align:left; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; font-size: 12px; }
+                h1 { color: #1a237e; border-bottom: 2px solid #1a237e; padding-bottom: 5px; margin: 10px 0; font-size: 18px; }
+                .meta { margin-bottom: 15px; font-size: 11px; color: #666; line-height: 1.3; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #e0e0e0; padding: 6px; text-align:left; font-size: 11px; }
                 th { background-color: #f5f5f5; font-weight: bold; }
-                .card-container { display: flex; gap: 20px; margin-bottom: 30px; }
-                .card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; flex: 1; }
-                .card-title { font-size: 0.8rem; text-transform: uppercase; color: #666; margin-bottom: 5px; }
-                .card-value { font-size: 1.5rem; font-weight: bold; color: #1a237e; }
-                svg { width: 24px !important; height: 24px !important; max-width: 24px !important; max-height: 24px !important; display: inline-block !important; vertical-align: middle !important; }
+                .card-container { display: flex; gap: 10px; margin-bottom: 15px; }
+                .card { border: 1px solid #ddd; padding: 10px; border-radius: 6px; flex: 1; }
+                .card-title { font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 3px; }
+                .card-value { font-size: 16px; font-weight: bold; color: #1a237e; }
+                svg { width: 16px !important; height: 16px !important; max-width: 16px !important; max-height: 16px !important; display: inline-block !important; vertical-align: middle !important; }
                 @media print {
+                    @page { margin: 10mm; }
+                    body { padding: 0 !important; font-size: 10px !important; }
                     button { display: none !important; }
-                    svg { width: 24px !important; height: 24px !important; max-width: 24px !important; max-height: 24px !important; }
+                    * { line-height: 1.2 !important; }
+                    h1 { font-size: 16px !important; margin: 5px 0 !important; padding-bottom: 3px !important; }
+                    .meta { margin-bottom: 10px !important; font-size: 9px !important; }
+                    .card-container { margin-bottom: 10px !important; gap: 8px !important; }
+                    .card { padding: 6px !important; }
+                    .card-title { font-size: 8px !important; }
+                    .card-value { font-size: 12px !important; }
+                    table { margin-top: 10px !important; }
+                    th, td { padding: 4px !important; font-size: 9px !important; }
                 }
             </style>
         `);
